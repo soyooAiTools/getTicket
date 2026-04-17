@@ -1,0 +1,19 @@
+[
+  {
+    "runId": "run-preprod-1",
+    "nodeId": "node-hk-1",
+    "region": "hk",
+    "role": "ANCHOR",
+    "mode": "PREPROD",
+    "averageRttMs": 20,
+    "startupSkewMs": 2,
+    "phaseSummaries": [
+      {
+        "phaseId": "peak",
+        "requestCount": 100,
+        "successCount": 96,
+        "averageLatencyMs": 180
+      }
+    ]
+  }
+]

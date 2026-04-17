@@ -1,0 +1,79 @@
+{
+  "id": "run_preprod_fixture",
+  "mode": "PREPROD",
+  "targetBaseUrl": "https://preprod-api.example.com",
+  "maxGlobalQps": 2400,
+  "maxNodeConcurrency": 180,
+  "tags": {
+    "test_run_id": "run_preprod_fixture"
+  },
+  "requestTemplates": {
+    "query": {
+      "method": "GET",
+      "path": "/api/catalog/events",
+      "timeoutMs": 1500
+    },
+    "queue": {
+      "method": "GET",
+      "path": "/api/queue/status",
+      "timeoutMs": 1500
+    },
+    "inventoryLock": {
+      "method": "POST",
+      "path": "/api/checkout/draft-orders",
+      "timeoutMs": 2500
+    },
+    "orderSubmit": {
+      "method": "POST",
+      "path": "/api/orders/submit",
+      "timeoutMs": 2500
+    }
+  },
+  "phases": [
+    {
+      "id": "warmup",
+      "startsAtOffsetMs": 0,
+      "durationMs": 1500000,
+      "queryConcurrency": 30,
+      "queuePollingConcurrency": 0,
+      "inventoryLockConcurrency": 0,
+      "orderSubmissionConcurrency": 0
+    },
+    {
+      "id": "ramp",
+      "startsAtOffsetMs": 1500000,
+      "durationMs": 290000,
+      "queryConcurrency": 120,
+      "queuePollingConcurrency": 24,
+      "inventoryLockConcurrency": 0,
+      "orderSubmissionConcurrency": 0
+    },
+    {
+      "id": "peak",
+      "startsAtOffsetMs": 1790000,
+      "durationMs": 15000,
+      "queryConcurrency": 300,
+      "queuePollingConcurrency": 120,
+      "inventoryLockConcurrency": 80,
+      "orderSubmissionConcurrency": 50
+    },
+    {
+      "id": "decay",
+      "startsAtOffsetMs": 1805000,
+      "durationMs": 55000,
+      "queryConcurrency": 180,
+      "queuePollingConcurrency": 140,
+      "inventoryLockConcurrency": 50,
+      "orderSubmissionConcurrency": 24
+    },
+    {
+      "id": "tail",
+      "startsAtOffsetMs": 1860000,
+      "durationMs": 120000,
+      "queryConcurrency": 50,
+      "queuePollingConcurrency": 18,
+      "inventoryLockConcurrency": 0,
+      "orderSubmissionConcurrency": 0
+    }
+  ]
+}

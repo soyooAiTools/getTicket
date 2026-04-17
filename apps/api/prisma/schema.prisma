@@ -1,0 +1,240 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  OPERATIONS
+  CUSTOMER_SERVICE
+}
+
+enum SaleStatus {
+  UPCOMING
+  ON_SALE
+  SOLD_OUT
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID_PENDING_FULFILLMENT
+  SUBMITTED_TO_VENDOR
+  TICKET_ISSUED
+  TICKET_FAILED
+  REFUND_REVIEWING
+  REFUND_PROCESSING
+  REFUNDED
+  COMPLETED
+  CLOSED
+}
+
+enum TicketType {
+  E_TICKET
+  PAPER_TICKET
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  ALIPAY
+  WECHAT_PAY
+  BANK_CARD
+}
+
+enum FulfillmentStatus {
+  PENDING
+  SUBMITTED
+  ISSUED
+  FAILED
+}
+
+enum RefundStatus {
+  REVIEWING
+  APPROVED
+  REJECTED
+  PROCESSING
+  COMPLETED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  role         UserRole
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Viewer {
+  id              String      @id @default(cuid())
+  userId          String
+  name            String
+  mobile          String
+  idCardEncrypted String
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  orderItems      OrderItem[]
+
+  @@index([userId, createdAt])
+}
+
+model CustomerAccount {
+  id            String            @id @default(cuid())
+  wechatOpenId  String            @unique
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  sessions      CustomerSession[]
+}
+
+model CustomerSession {
+  id          String          @id @default(cuid())
+  customerId  String
+  tokenHash   String          @unique
+  expiresAt   DateTime
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  customer    CustomerAccount @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId, expiresAt])
+}
+
+model Event {
+  id            String         @id @default(cuid())
+  title         String
+  city          String
+  venueName     String
+  venueAddress  String?
+  coverImageUrl String?
+  description   String?
+  published     Boolean        @default(false)
+  refundEntryEnabled Boolean    @default(false)
+  saleStatus    SaleStatus
+  minPrice      Int
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  sessions      EventSession[]
+}
+
+model EventSession {
+  id           String       @id @default(cuid())
+  eventId      String
+  name         String
+  startsAt     DateTime
+  endsAt       DateTime?
+  saleStartsAt DateTime?
+  saleEndsAt   DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  event        Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  ticketTiers  TicketTier[]
+
+  @@index([eventId, startsAt])
+}
+
+model TicketTier {
+  id         String       @id @default(cuid())
+  sessionId  String
+  name       String
+  price      Int
+  inventory  Int
+  ticketType TicketType
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  session    EventSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+
+  @@index([sessionId])
+}
+
+model Order {
+  id             String             @id @default(cuid())
+  orderNumber    String             @unique
+  userId         String
+  status         OrderStatus        @default(PENDING_PAYMENT)
+  ticketType     TicketType
+  totalAmount    Int
+  currency       String             @default("CNY")
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  items          OrderItem[]
+  payments       Payment[]
+  fulfillments   FulfillmentEvent[]
+  refundRequests RefundRequest[]
+
+  @@index([userId, createdAt])
+}
+
+model OrderItem {
+  id           String       @id @default(cuid())
+  orderId      String
+  ticketTierId String
+  viewerId     String
+  quantity     Int
+  unitPrice    Int
+  totalAmount  Int
+  createdAt    DateTime     @default(now())
+  order        Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  ticketTier   TicketTier   @relation(fields: [ticketTierId], references: [id])
+  viewer       Viewer       @relation(fields: [viewerId], references: [id])
+
+  @@index([orderId])
+  @@index([ticketTierId])
+  @@index([viewerId])
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  orderId       String
+  amount        Int
+  method        PaymentMethod
+  status        PaymentStatus @default(PENDING)
+  providerTxnId String?       @unique
+  paidAt        DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+}
+
+model FulfillmentEvent {
+  id          String            @id @default(cuid())
+  orderId     String
+  status      FulfillmentStatus @default(PENDING)
+  externalRef String?           @unique
+  payload     Json?
+  occurredAt  DateTime          @default(now())
+  createdAt   DateTime          @default(now())
+  order       Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, occurredAt])
+}
+
+model RefundRequest {
+  id              String       @id @default(cuid())
+  orderId         String
+  refundNo        String       @unique
+  reason          String
+  status          RefundStatus @default(REVIEWING)
+  requestedAmount Int
+  serviceFee      Int
+  refundAmount    Int
+  requestedBy     String?
+  requestedAt     DateTime     @default(now())
+  processedAt     DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  order           Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, requestedAt])
+}

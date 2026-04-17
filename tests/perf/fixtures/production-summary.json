@@ -1,0 +1,19 @@
+[
+  {
+    "runId": "run-prod-1",
+    "nodeId": "node-hk-1",
+    "region": "hk",
+    "role": "ANCHOR",
+    "mode": "WHITELIST_FULL_PATH",
+    "averageRttMs": 24,
+    "startupSkewMs": 3,
+    "phaseSummaries": [
+      {
+        "phaseId": "peak",
+        "requestCount": 100,
+        "successCount": 92,
+        "averageLatencyMs": 210
+      }
+    ]
+  }
+]

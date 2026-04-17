@@ -1,0 +1,23 @@
+[
+  {
+    "id": "hk-anchor",
+    "label": "Hong Kong anchor",
+    "baseLatencyMs": 18,
+    "jitterMs": 4,
+    "packetLossRatio": 0.002
+  },
+  {
+    "id": "sg-edge",
+    "label": "Singapore edge",
+    "baseLatencyMs": 45,
+    "jitterMs": 12,
+    "packetLossRatio": 0.01
+  },
+  {
+    "id": "eu-edge",
+    "label": "Europe edge",
+    "baseLatencyMs": 165,
+    "jitterMs": 25,
+    "packetLossRatio": 0.02
+  }
+]
