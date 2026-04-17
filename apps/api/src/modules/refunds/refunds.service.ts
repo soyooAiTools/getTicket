@@ -14,6 +14,7 @@ export type CalculateServiceFeeInput = {
 };
 
 export type RequestRefundInput = {
+  customerId: string;
   orderId: string;
   reasonCode: RefundReasonCode;
   daysBeforeStart: number;
@@ -39,6 +40,57 @@ type VendorRefundResult = {
   orderId: string;
   refundNo: string;
   source: 'VENDOR_CALLBACK';
+};
+
+type AdminRefundEventSummary = {
+  city: string;
+  id: string;
+  title: string;
+  venueName: string;
+};
+
+type PrismaAdminRefundRequest = {
+  id: string;
+  order: {
+    id: string;
+    items: Array<{
+      ticketTier: {
+        session: {
+          event: AdminRefundEventSummary;
+          name: string;
+        };
+      };
+    }>;
+    orderNumber: string;
+    status: string;
+    userId: string;
+  };
+  processedAt: Date | null;
+  reason: string;
+  refundAmount: number;
+  refundNo: string;
+  requestedAmount: number;
+  requestedAt: Date;
+  serviceFee: number;
+  status: string;
+};
+
+export type AdminRefundRequestItem = {
+  event?: AdminRefundEventSummary;
+  id: string;
+  orderId: string;
+  orderNumber: string;
+  orderStatus: string;
+  processedAt?: string;
+  reason: string;
+  refundAmount: number;
+  refundNo: string;
+  requestedAmount: number;
+  requestedAt: string;
+  serviceFee: number;
+  sessionName?: string;
+  status: string;
+  userId: string;
 };
 
 const REFUNDABLE_ORDER_STATUSES = new Set([
@@ -75,11 +127,79 @@ export class RefundsService {
     };
   }
 
+  async listAdminRequests(): Promise<AdminRefundRequestItem[]> {
+    const refundRequests = await this.prisma.refundRequest.findMany({
+      include: {
+        order: {
+          select: {
+            id: true,
+            items: {
+              orderBy: {
+                createdAt: 'asc',
+              },
+              select: {
+                ticketTier: {
+                  select: {
+                    session: {
+                      select: {
+                        event: {
+                          select: {
+                            city: true,
+                            id: true,
+                            title: true,
+                            venueName: true,
+                          },
+                        },
+                        name: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            orderNumber: true,
+            status: true,
+            userId: true,
+          },
+        },
+      },
+      orderBy: {
+        requestedAt: 'desc',
+      },
+    });
+
+    return refundRequests.map((refundRequest: PrismaAdminRefundRequest) => {
+      const firstItem = refundRequest.order.items[0];
+
+      return {
+        event: firstItem?.ticketTier.session.event,
+        id: refundRequest.id,
+        orderId: refundRequest.order.id,
+        orderNumber: refundRequest.order.orderNumber,
+        orderStatus: refundRequest.order.status,
+        processedAt: refundRequest.processedAt?.toISOString(),
+        reason: refundRequest.reason,
+        refundAmount: refundRequest.refundAmount,
+        refundNo: refundRequest.refundNo,
+        requestedAmount: refundRequest.requestedAmount,
+        requestedAt: refundRequest.requestedAt.toISOString(),
+        serviceFee: refundRequest.serviceFee,
+        sessionName: firstItem?.ticketTier.session.name,
+        status: refundRequest.status,
+        userId: refundRequest.order.userId,
+      };
+    });
+  }
+
   async requestRefund(input: RequestRefundInput) {
     const refundRequest = await this.prisma.$transaction(async (tx) => {
       const order = await this.findOrderForRefundRequest(tx, input.orderId);
 
       if (!order) {
+        throw new BadRequestException('orderId does not exist.');
+      }
+
+      if (order.userId !== input.customerId) {
         throw new BadRequestException('orderId does not exist.');
       }
 
@@ -184,6 +304,49 @@ export class RefundsService {
       refundNo: refundRequest.refundNo,
     });
 
+    const refundTransitionResult = await this.prisma.refundRequest.updateMany({
+      data: {
+        status: 'PROCESSING',
+      },
+      where: {
+        refundNo: refundRequest.refundNo,
+        status: 'REVIEWING',
+      },
+    });
+
+    if (refundTransitionResult.count === 0) {
+      const currentRefundRequest = await this.prisma.refundRequest.findUnique({
+        select: {
+          orderId: true,
+          refundAmount: true,
+          refundNo: true,
+          status: true,
+        },
+        where: {
+          refundNo: refundRequest.refundNo,
+        },
+      });
+
+      if (!currentRefundRequest) {
+        throw new BadRequestException('refundNo does not exist.');
+      }
+
+      this.assertVendorRefundMatches(currentRefundRequest, {
+        amount: refundRequest.refundAmount,
+        orderId: input.orderId,
+        refundNo: refundRequest.refundNo,
+      });
+
+      if (
+        currentRefundRequest.status !== 'PROCESSING' &&
+        currentRefundRequest.status !== 'COMPLETED'
+      ) {
+        throw new BadRequestException(
+          'order refund request state changed unexpectedly.',
+        );
+      }
+    }
+
     const transitionResult = await this.prisma.order.updateMany({
       data: {
         status: ORDER_STATUS.REFUND_PROCESSING,
@@ -252,7 +415,9 @@ export class RefundsService {
         },
         where: {
           refundNo: input.refundNo,
-          status: 'REVIEWING',
+          status: {
+            in: ['REVIEWING', 'PROCESSING'],
+          },
         },
       });
 
@@ -355,6 +520,7 @@ export class RefundsService {
         id: true,
         status: true,
         totalAmount: true,
+        userId: true,
       },
       where: {
         id: orderId,

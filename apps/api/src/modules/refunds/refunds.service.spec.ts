@@ -1,7 +1,10 @@
 import { BadRequestException } from '@nestjs/common';
+import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { Test } from '@nestjs/testing';
 
+import { CustomerSessionGuard } from '../../common/auth/customer-session.guard';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { VendorCallbackSecretGuard } from '../../common/auth/vendor-callback-secret.guard';
 import { UpstreamTicketingGateway } from '../../common/vendors/upstream-ticketing.gateway';
 import { ORDER_STATUS } from '../orders/order-status';
 import { RefundsController } from './refunds.controller';
@@ -20,6 +23,7 @@ describe('RefundsService', () => {
     refundRequest: {
       create: jest.fn(),
       findFirst: jest.fn(),
+      findMany: jest.fn(),
       findUnique: jest.fn(),
       updateMany: jest.fn(),
     },
@@ -44,6 +48,7 @@ describe('RefundsService', () => {
     txPrismaMock.payment.updateMany.mockReset();
     txPrismaMock.refundRequest.create.mockReset();
     txPrismaMock.refundRequest.findFirst.mockReset();
+    txPrismaMock.refundRequest.findMany.mockReset();
     txPrismaMock.refundRequest.findUnique.mockReset();
     txPrismaMock.refundRequest.updateMany.mockReset();
     (prismaMock.$transaction as jest.Mock).mockReset();
@@ -59,6 +64,7 @@ describe('RefundsService', () => {
       id: 'order_123',
       status: ORDER_STATUS.TICKET_ISSUED,
       totalAmount: 100000,
+      userId: 'cust_123',
     });
     txPrismaMock.refundRequest.create.mockResolvedValue({
       refundNo: 'RFD-1713340800000-ab12cd34',
@@ -66,6 +72,7 @@ describe('RefundsService', () => {
       refundAmount: 80000,
     });
     txPrismaMock.order.updateMany.mockResolvedValue({ count: 1 });
+    txPrismaMock.refundRequest.updateMany.mockResolvedValue({ count: 1 });
     (upstreamGatewayMock.submitRefund as jest.Mock).mockResolvedValue({
       externalRef: 'vendor_refund_1',
     });
@@ -81,6 +88,7 @@ describe('RefundsService', () => {
     const service = moduleRef.get(RefundsService);
 
     const result = await service.requestRefund({
+      customerId: 'cust_123',
       orderId: 'order_123',
       reasonCode: 'USER_IDENTITY_ERROR',
       daysBeforeStart: 2,
@@ -92,6 +100,7 @@ describe('RefundsService', () => {
         id: true,
         status: true,
         totalAmount: true,
+        userId: true,
       },
       where: {
         id: 'order_123',
@@ -134,6 +143,15 @@ describe('RefundsService', () => {
       orderId: 'order_123',
       refundNo: expect.stringMatching(/^RFD-\d+-[a-z0-9]+$/),
     });
+    expect(txPrismaMock.refundRequest.updateMany).toHaveBeenCalledWith({
+      data: {
+        status: 'PROCESSING',
+      },
+      where: {
+        refundNo: expect.stringMatching(/^RFD-\d+-[a-z0-9]+$/),
+        status: 'REVIEWING',
+      },
+    });
     expect(txPrismaMock.order.updateMany).toHaveBeenNthCalledWith(2, {
       data: {
         status: ORDER_STATUS.REFUND_PROCESSING,
@@ -156,6 +174,7 @@ describe('RefundsService', () => {
       id: 'order_123',
       status: ORDER_STATUS.REFUND_REVIEWING,
       totalAmount: 100000,
+      userId: 'cust_123',
     });
     txPrismaMock.refundRequest.findFirst.mockResolvedValue({
       refundAmount: 80000,
@@ -163,6 +182,7 @@ describe('RefundsService', () => {
       serviceFee: 20000,
     });
     txPrismaMock.order.updateMany.mockResolvedValue({ count: 1 });
+    txPrismaMock.refundRequest.updateMany.mockResolvedValue({ count: 1 });
     (upstreamGatewayMock.submitRefund as jest.Mock).mockResolvedValue({
       externalRef: 'vendor_refund_retry_1',
     });
@@ -178,6 +198,7 @@ describe('RefundsService', () => {
     const service = moduleRef.get(RefundsService);
 
     const result = await service.requestRefund({
+      customerId: 'cust_123',
       orderId: 'order_123',
       reasonCode: 'OTHER',
       daysBeforeStart: 5,
@@ -217,6 +238,7 @@ describe('RefundsService', () => {
         id: 'order_123',
         status: ORDER_STATUS.TICKET_ISSUED,
         totalAmount: 100000,
+        userId: 'cust_123',
       })
       .mockResolvedValueOnce({
         status: ORDER_STATUS.REFUNDED,
@@ -225,6 +247,13 @@ describe('RefundsService', () => {
       refundNo: 'RFD-1713340800000-ab12cd34',
       serviceFee: 20000,
       refundAmount: 80000,
+    });
+    txPrismaMock.refundRequest.updateMany.mockResolvedValueOnce({ count: 0 });
+    txPrismaMock.refundRequest.findUnique.mockResolvedValueOnce({
+      orderId: 'order_123',
+      refundAmount: 80000,
+      refundNo: 'RFD-1713340800000-ab12cd34',
+      status: 'COMPLETED',
     });
     txPrismaMock.order.updateMany
       .mockResolvedValueOnce({ count: 1 })
@@ -244,6 +273,7 @@ describe('RefundsService', () => {
 
     await expect(
       service.requestRefund({
+        customerId: 'cust_123',
         orderId: 'order_123',
         reasonCode: 'USER_IDENTITY_ERROR',
         daysBeforeStart: 2,
@@ -264,6 +294,15 @@ describe('RefundsService', () => {
         status: ORDER_STATUS.REFUND_REVIEWING,
       },
     });
+    expect(txPrismaMock.refundRequest.updateMany).toHaveBeenCalledWith({
+      data: {
+        status: 'PROCESSING',
+      },
+      where: {
+        refundNo: 'RFD-1713340800000-ab12cd34',
+        status: 'REVIEWING',
+      },
+    });
     expect(txPrismaMock.order.update).not.toHaveBeenCalled();
   });
 
@@ -272,6 +311,7 @@ describe('RefundsService', () => {
       id: 'order_123',
       status: ORDER_STATUS.TICKET_ISSUED,
       totalAmount: 100000,
+      userId: 'cust_123',
     });
     txPrismaMock.refundRequest.create.mockResolvedValue({
       refundNo: 'RFD-1713340800000-ab12cd34',
@@ -295,6 +335,7 @@ describe('RefundsService', () => {
 
     await expect(
       service.requestRefund({
+        customerId: 'cust_123',
         orderId: 'order_123',
         reasonCode: 'USER_IDENTITY_ERROR',
         daysBeforeStart: 2,
@@ -319,6 +360,7 @@ describe('RefundsService', () => {
 
     await expect(
       service.requestRefund({
+        customerId: 'cust_123',
         orderId: 'missing_order',
         reasonCode: 'OTHER',
         daysBeforeStart: 5,
@@ -334,6 +376,7 @@ describe('RefundsService', () => {
       id: 'order_123',
       status: ORDER_STATUS.PENDING_PAYMENT,
       totalAmount: 100000,
+      userId: 'cust_123',
     });
 
     const moduleRef = await Test.createTestingModule({
@@ -348,6 +391,7 @@ describe('RefundsService', () => {
 
     await expect(
       service.requestRefund({
+        customerId: 'cust_123',
         orderId: 'order_123',
         reasonCode: 'OTHER',
         daysBeforeStart: 5,
@@ -366,11 +410,13 @@ describe('RefundsService', () => {
         id: 'order_123',
         status: ORDER_STATUS.TICKET_ISSUED,
         totalAmount: 100000,
+        userId: 'cust_123',
       })
       .mockResolvedValueOnce({
         id: 'order_123',
         status: ORDER_STATUS.REFUND_REVIEWING,
         totalAmount: 100000,
+        userId: 'cust_123',
       });
     txPrismaMock.order.updateMany.mockResolvedValue({ count: 0 });
 
@@ -386,6 +432,7 @@ describe('RefundsService', () => {
 
     await expect(
       service.requestRefund({
+        customerId: 'cust_123',
         orderId: 'order_123',
         reasonCode: 'OTHER',
         daysBeforeStart: 5,
@@ -419,11 +466,13 @@ describe('RefundsService', () => {
         id: 'order_123',
         status: ORDER_STATUS.TICKET_ISSUED,
         totalAmount: 100000,
+        userId: 'cust_123',
       })
       .mockResolvedValueOnce({
         id: 'order_123',
         status: ORDER_STATUS.TICKET_ISSUED,
         totalAmount: 100000,
+        userId: 'cust_123',
       });
     txPrismaMock.order.updateMany.mockResolvedValue({ count: 0 });
 
@@ -439,6 +488,7 @@ describe('RefundsService', () => {
 
     await expect(
       service.requestRefund({
+        customerId: 'cust_123',
         orderId: 'order_123',
         reasonCode: 'OTHER',
         daysBeforeStart: 5,
@@ -502,7 +552,9 @@ describe('RefundsService', () => {
       },
       where: {
         refundNo: 'RFD-1713340800000-ab12cd34',
-        status: 'REVIEWING',
+        status: {
+          in: ['REVIEWING', 'PROCESSING'],
+        },
       },
     });
     expect(txPrismaMock.order.update).toHaveBeenCalledWith({
@@ -682,7 +734,9 @@ describe('RefundsService', () => {
       },
       where: {
         refundNo: 'RFD-1713340800000-ab12cd34',
-        status: 'REVIEWING',
+        status: {
+          in: ['REVIEWING', 'PROCESSING'],
+        },
       },
     });
     expect(txPrismaMock.refundRequest.findUnique).toHaveBeenNthCalledWith(2, {
@@ -700,6 +754,119 @@ describe('RefundsService', () => {
     expect(txPrismaMock.payment.updateMany).not.toHaveBeenCalled();
   });
 
+  it('lists admin refund requests with order and event context', async () => {
+    txPrismaMock.refundRequest.findMany.mockResolvedValue([
+      {
+        id: 'refund_1',
+        order: {
+          id: 'ord_1',
+          items: [
+            {
+              ticketTier: {
+                session: {
+                  event: {
+                    city: 'Shanghai',
+                    id: 'event_beta_1',
+                    title: 'Beta Concert',
+                    venueName: 'Expo Arena',
+                  },
+                  name: '2026-05-01 19:30',
+                },
+              },
+            },
+          ],
+          orderNumber: 'ORD-001',
+          status: ORDER_STATUS.REFUND_PROCESSING,
+          userId: 'cust_1',
+        },
+        processedAt: new Date('2026-04-17T13:00:00.000Z'),
+        reason: 'USER_IDENTITY_ERROR',
+        refundAmount: 80000,
+        refundNo: 'RFD-001',
+        requestedAmount: 100000,
+        requestedAt: new Date('2026-04-17T12:30:00.000Z'),
+        serviceFee: 20000,
+        status: 'PROCESSING',
+      },
+    ]);
+
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        RefundsService,
+        { provide: PrismaService, useValue: prismaMock },
+        { provide: UpstreamTicketingGateway, useValue: upstreamGatewayMock },
+      ],
+    }).compile();
+
+    const service = moduleRef.get(RefundsService);
+
+    await expect(service.listAdminRequests()).resolves.toEqual([
+      {
+        event: {
+          city: 'Shanghai',
+          id: 'event_beta_1',
+          title: 'Beta Concert',
+          venueName: 'Expo Arena',
+        },
+        id: 'refund_1',
+        orderId: 'ord_1',
+        orderNumber: 'ORD-001',
+        orderStatus: 'REFUND_PROCESSING',
+        processedAt: '2026-04-17T13:00:00.000Z',
+        reason: 'USER_IDENTITY_ERROR',
+        refundAmount: 80000,
+        refundNo: 'RFD-001',
+        requestedAmount: 100000,
+        requestedAt: '2026-04-17T12:30:00.000Z',
+        serviceFee: 20000,
+        sessionName: '2026-05-01 19:30',
+        status: 'PROCESSING',
+        userId: 'cust_1',
+      },
+    ]);
+
+    expect(txPrismaMock.refundRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: {
+          requestedAt: 'desc',
+        },
+      }),
+    );
+  });
+
+  it('rejects refund requests for orders not owned by the authenticated customer', async () => {
+    txPrismaMock.order.findUnique.mockResolvedValue({
+      id: 'order_123',
+      status: ORDER_STATUS.TICKET_ISSUED,
+      totalAmount: 100000,
+      userId: 'cust_other',
+    });
+
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        RefundsService,
+        { provide: PrismaService, useValue: prismaMock },
+        { provide: UpstreamTicketingGateway, useValue: upstreamGatewayMock },
+      ],
+    }).compile();
+
+    const service = moduleRef.get(RefundsService);
+
+    await expect(
+      service.requestRefund({
+        customerId: 'cust_123',
+        orderId: 'order_123',
+        reasonCode: 'OTHER',
+        daysBeforeStart: 5,
+      }),
+    ).rejects.toThrow(
+      new BadRequestException('orderId does not exist.'),
+    );
+    expect(txPrismaMock.order.updateMany).not.toHaveBeenCalled();
+    expect(txPrismaMock.refundRequest.create).not.toHaveBeenCalled();
+    expect(upstreamGatewayMock.submitRefund).not.toHaveBeenCalled();
+  });
+
   it('rejects malformed refund request payloads at the controller boundary', async () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [RefundsController],
@@ -713,12 +880,43 @@ describe('RefundsService', () => {
     const controller = moduleRef.get(RefundsController);
 
     await expect(
-      controller.requestRefund({
-        orderId: '',
-        reasonCode: 'USER_IDENTITY_ERROR',
-        daysBeforeStart: 2,
-      }),
+      controller.requestRefund(
+        {
+          orderId: '',
+          reasonCode: 'USER_IDENTITY_ERROR',
+          daysBeforeStart: 2,
+        },
+        { id: 'cust_123', openId: 'openid_abc' },
+      ),
     ).rejects.toThrow(BadRequestException);
+  });
+
+  it('passes the authenticated customer id into refund requests', async () => {
+    const serviceMock = {
+      requestRefund: jest.fn().mockResolvedValue({
+        refundNo: 'RFD-001',
+      }),
+    } as never;
+    const controller = new RefundsController(serviceMock);
+
+    const result = await controller.requestRefund(
+      {
+        orderId: 'order_123',
+        reasonCode: 'OTHER',
+        daysBeforeStart: 5,
+      },
+      { id: 'cust_123', openId: 'openid_abc' },
+    );
+
+    expect(serviceMock.requestRefund).toHaveBeenCalledWith({
+      customerId: 'cust_123',
+      daysBeforeStart: 5,
+      orderId: 'order_123',
+      reasonCode: 'OTHER',
+    });
+    expect(result).toEqual({
+      refundNo: 'RFD-001',
+    });
   });
 
   it('routes a vendor refund callback through the refunds controller', async () => {
@@ -751,5 +949,25 @@ describe('RefundsService', () => {
       refundNo: 'RFD-1713340800000-ab12cd34',
       source: 'VENDOR_CALLBACK',
     });
+  });
+
+  it('protects refund request creation behind the customer session guard', () => {
+    const guards =
+      Reflect.getMetadata(
+        GUARDS_METADATA,
+        RefundsController.prototype.requestRefund,
+      ) ?? [];
+
+    expect(guards).toContain(CustomerSessionGuard);
+  });
+
+  it('protects vendor refund callbacks behind the vendor callback secret guard', () => {
+    const guards =
+      Reflect.getMetadata(
+        GUARDS_METADATA,
+        RefundsController.prototype.handleVendorCallback,
+      ) ?? [];
+
+    expect(guards).toContain(VendorCallbackSecretGuard);
   });
 });

@@ -1,5 +1,19 @@
-import { BadRequestException, Body, Controller, Post } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 
+import { AdminApiSecretGuard } from '../../common/auth/admin-api-secret.guard';
+import {
+  CurrentCustomer,
+  type CurrentCustomerPrincipal,
+} from '../../common/auth/current-customer.decorator';
+import { CustomerSessionGuard } from '../../common/auth/customer-session.guard';
+import { VendorCallbackSecretGuard } from '../../common/auth/vendor-callback-secret.guard';
 import {
   RecordVendorRefundInput,
   RefundReasonCode,
@@ -127,6 +141,14 @@ function assertVendorRefundCallbackRequest(
 export class RefundsController {
   constructor(private readonly refundsService: RefundsService) {}
 
+  @Get('admin')
+  @UseGuards(AdminApiSecretGuard)
+  async listAdminRequests() {
+    return {
+      items: await this.refundsService.listAdminRequests(),
+    };
+  }
+
   @Post('calculate')
   calculate(@Body() body: unknown) {
     assertCalculateRefundRequest(body);
@@ -135,15 +157,23 @@ export class RefundsController {
   }
 
   @Post('request')
-  async requestRefund(@Body() body: unknown) {
+  @UseGuards(CustomerSessionGuard)
+  async requestRefund(
+    @Body() body: unknown,
+    @CurrentCustomer() customer: CurrentCustomerPrincipal,
+  ) {
     assertRequestRefundRequest(body);
 
-    const request: RequestRefundInput = body;
+    const request: RequestRefundInput = {
+      ...(body as RequestRefundRequest),
+      customerId: customer.id,
+    };
 
     return this.refundsService.requestRefund(request);
   }
 
   @Post('vendor-callback')
+  @UseGuards(VendorCallbackSecretGuard)
   async handleVendorCallback(@Body() body: unknown) {
     assertVendorRefundCallbackRequest(body);
 

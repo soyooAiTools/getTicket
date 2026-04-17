@@ -1,28 +1,113 @@
-import { Button, Empty, Space, Table, Tag, Typography } from 'antd';
+import { Alert, Button, Input, Select, Space, Table, Tag, Typography } from 'antd';
+import { useEffect, useState } from 'react';
+
+import { request } from '../../services/request';
 
 type RefundRow = {
+  event?: {
+    city: string;
+    id: string;
+    title: string;
+    venueName: string;
+  };
   id: string;
   orderId: string;
+  orderNumber: string;
+  orderStatus: string;
+  processedAt?: string;
+  reason: string;
+  refundAmount: number;
   refundNo: string;
-  source: 'USER_REQUEST' | 'VENDOR_CALLBACK';
-  status: 'REVIEWING' | 'REFUNDED';
+  requestedAmount: number;
+  requestedAt: string;
+  serviceFee: number;
+  sessionName?: string;
+  status: string;
+  userId: string;
 };
 
-const refundRows: RefundRow[] = [];
+const refundStatusMeta: Record<string, { color: string; label: string }> = {
+  APPROVED: { color: 'blue', label: 'Approved' },
+  COMPLETED: { color: 'green', label: 'Completed' },
+  PROCESSING: { color: 'cyan', label: 'Processing' },
+  REJECTED: { color: 'red', label: 'Rejected' },
+  REVIEWING: { color: 'gold', label: 'Reviewing' },
+};
 
-const sourceMeta: Record<RefundRow['source'], { color: string; label: string }> =
-  {
-    USER_REQUEST: { color: 'blue', label: '\u7528\u6237\u7533\u8bf7' },
-    VENDOR_CALLBACK: { color: 'purple', label: '\u5382\u5546\u56de\u8c03' },
-  };
+const refundStatusOptions = Object.entries(refundStatusMeta).map(
+  ([value, meta]) => ({
+    label: meta.label,
+    value,
+  }),
+);
 
-const statusMeta: Record<RefundRow['status'], { color: string; label: string }> =
-  {
-    REVIEWING: { color: 'gold', label: '\u5ba1\u6838\u4e2d' },
-    REFUNDED: { color: 'green', label: '\u5df2\u9000\u6b3e' },
-  };
+function formatAmount(amount: number) {
+  return new Intl.NumberFormat('zh-CN', {
+    currency: 'CNY',
+    style: 'currency',
+  }).format(amount / 100);
+}
+
+function formatDateTime(value: string | undefined) {
+  if (!value) {
+    return '-';
+  }
+
+  return new Date(value).toLocaleString('zh-CN', {
+    hour12: false,
+  });
+}
 
 export function RefundsPage() {
+  const [rows, setRows] = useState<RefundRow[]>([]);
+  const [error, setError] = useState<string>();
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>();
+
+  async function loadRefunds() {
+    setLoading(true);
+    setError(undefined);
+
+    try {
+      const response = await request<{ items: RefundRow[] }>('/refunds/admin');
+      setRows(response.items ?? []);
+    } catch (loadError) {
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : 'Unable to load refunds.',
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadRefunds();
+  }, []);
+
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredRows = rows.filter((row) => {
+    if (statusFilter && row.status !== statusFilter) {
+      return false;
+    }
+
+    if (!normalizedQuery) {
+      return true;
+    }
+
+    return [
+      row.refundNo,
+      row.orderNumber,
+      row.userId,
+      row.event?.title,
+      row.reason,
+    ]
+      .filter(Boolean)
+      .some((value) => value?.toLowerCase().includes(normalizedQuery));
+  });
+
   return (
     <div style={{ padding: 24 }}>
       <Space
@@ -32,76 +117,114 @@ export function RefundsPage() {
       >
         <div>
           <Typography.Title level={3} style={{ marginBottom: 8 }}>
-            \u9000\u6b3e\u5360\u4f4d\u5de5\u4f5c\u53f0
+            Refund operations
           </Typography.Title>
           <Typography.Paragraph style={{ marginBottom: 0 }}>
-            \u8fd9\u91cc\u4ec5\u5c55\u793a\u9000\u6b3e\u6d41\u7a0b\u7684\u5360\u4f4d\u6846\u67b6\uff0c\u5f53\u524d\u4e0d\u4ee3\u8868\u771f\u5b9e\u53ef\u64cd\u4f5c\u6570\u636e\u3002
-          </Typography.Paragraph>
-          <Typography.Paragraph type='warning' style={{ marginBottom: 0 }}>
-            \u5f53\u524d\u9875\u9762\u4ec5\u7528\u4e8e\u540e\u7eed\u63a5\u5165\u5ba1\u6838\u3001\u8ba1\u7b97\u548c\u56de\u8c03\u6d41\u7a0b\uff0c\u6240\u6709\u64cd\u4f5c\u5747\u4e3a\u5360\u4f4d\u5c55\u793a\u3002
+            Live refund request queue with requested amounts, service fees, and
+            callback outcomes.
           </Typography.Paragraph>
         </div>
 
+        {error ? <Alert message={error} showIcon type='error' /> : null}
+
         <Space wrap>
-          <Button disabled>\u5360\u4f4d\u64cd\u4f5c</Button>
-          <Button type='primary' disabled>
-            \u6682\u4e0d\u53ef\u7528
+          <Input
+            allowClear
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder='Search refund, order, customer, event, or reason'
+            style={{ width: 320 }}
+            value={query}
+          />
+          <Select
+            allowClear
+            onChange={(value) => setStatusFilter(value)}
+            options={refundStatusOptions}
+            placeholder='Filter by refund status'
+            style={{ width: 200 }}
+            value={statusFilter}
+          />
+          <Button loading={loading} onClick={() => void loadRefunds()}>
+            Refresh
           </Button>
         </Space>
 
         <Table<RefundRow>
           columns={[
             {
-              dataIndex: 'orderId',
-              key: 'orderId',
-              title: '\u8ba2\u5355\u53f7',
-            },
-            {
               dataIndex: 'refundNo',
               key: 'refundNo',
-              title: '\u9000\u6b3e\u5355\u53f7',
+              title: 'Refund',
+              render: (_value: string, record) => (
+                <Space direction='vertical' size={0}>
+                  <Typography.Text strong>{record.refundNo}</Typography.Text>
+                  <Typography.Text type='secondary'>
+                    {record.orderNumber} / {record.userId}
+                  </Typography.Text>
+                </Space>
+              ),
             },
             {
-              dataIndex: 'source',
-              key: 'source',
-              title: '\u6765\u6e90',
-              render: (source: RefundRow['source']) => {
-                const meta = sourceMeta[source];
-
-                return <Tag color={meta.color}>{meta.label}</Tag>;
-              },
+              dataIndex: 'event',
+              key: 'event',
+              title: 'Event',
+              render: (_value: RefundRow['event'], record) => (
+                <Space direction='vertical' size={0}>
+                  <Typography.Text strong>
+                    {record.event?.title ?? 'Unknown event'}
+                  </Typography.Text>
+                  <Typography.Text type='secondary'>
+                    {record.sessionName ?? '-'} / {record.orderStatus}
+                  </Typography.Text>
+                </Space>
+              ),
             },
             {
               dataIndex: 'status',
               key: 'status',
-              title: '\u72b6\u6001',
-              render: (status: RefundRow['status']) => {
-                const meta = statusMeta[status];
-
-                return <Tag color={meta.color}>{meta.label}</Tag>;
-              },
+              title: 'Status',
+              render: (_value: string, record) => (
+                <Space direction='vertical' size={4}>
+                  <Tag color={refundStatusMeta[record.status]?.color ?? 'default'}>
+                    {refundStatusMeta[record.status]?.label ?? record.status}
+                  </Tag>
+                  <Typography.Text type='secondary'>{record.reason}</Typography.Text>
+                </Space>
+              ),
             },
             {
-              key: 'actions',
-              title: '\u64cd\u4f5c',
-              render: () => (
-                <Button type='link' disabled>
-                  \u67e5\u770b
-                </Button>
+              dataIndex: 'refundAmount',
+              key: 'refundAmount',
+              title: 'Amounts',
+              render: (_value: number, record) => (
+                <Space direction='vertical' size={0}>
+                  <Typography.Text strong>
+                    Refund: {formatAmount(record.refundAmount)}
+                  </Typography.Text>
+                  <Typography.Text type='secondary'>
+                    Requested: {formatAmount(record.requestedAmount)} / Fee:{' '}
+                    {formatAmount(record.serviceFee)}
+                  </Typography.Text>
+                </Space>
+              ),
+            },
+            {
+              dataIndex: 'requestedAt',
+              key: 'requestedAt',
+              title: 'Timeline',
+              render: (_value: string, record) => (
+                <Space direction='vertical' size={0}>
+                  <Typography.Text>
+                    Requested: {formatDateTime(record.requestedAt)}
+                  </Typography.Text>
+                  <Typography.Text type='secondary'>
+                    Processed: {formatDateTime(record.processedAt)}
+                  </Typography.Text>
+                </Space>
               ),
             },
           ]}
-          dataSource={refundRows}
-          locale={{
-            emptyText: (
-              <Empty
-                description={
-                  '\u5f53\u524d\u6682\u65e0\u9000\u6b3e\u8bb0\u5f55\uff0c\u8fd9\u91cc\u4ec5\u4fdd\u7559\u5360\u4f4d\u8868\u683c\u7528\u4e8e\u540e\u7eed\u63a5\u5165\u3002'
-                }
-              />
-            ),
-          }}
-          pagination={false}
+          dataSource={filteredRows}
+          loading={loading}
           rowKey='id'
         />
       </Space>

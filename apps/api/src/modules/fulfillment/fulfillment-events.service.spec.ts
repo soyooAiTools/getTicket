@@ -1,7 +1,10 @@
 import { Test } from '@nestjs/testing';
+import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { Prisma } from '@prisma/client';
 
+import { AdminApiSecretGuard } from '../../common/auth/admin-api-secret.guard';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { VendorCallbackSecretGuard } from '../../common/auth/vendor-callback-secret.guard';
 import { UpstreamTicketingGateway } from '../../common/vendors/upstream-ticketing.gateway';
 import { FulfillmentController } from './fulfillment.controller';
 import { FulfillmentEventsService } from './fulfillment-events.service';
@@ -14,6 +17,7 @@ describe('FulfillmentEventsService', () => {
   const txPrismaMock = {
     fulfillmentEvent: {
       create: jest.fn(),
+      findMany: jest.fn(),
       findUnique: jest.fn(),
     },
     order: {
@@ -24,6 +28,7 @@ describe('FulfillmentEventsService', () => {
 
   const prismaMock = {
     $transaction: jest.fn(),
+    fulfillmentEvent: txPrismaMock.fulfillmentEvent,
   } as unknown as PrismaService;
 
   const upstreamGatewayMock = {
@@ -33,6 +38,7 @@ describe('FulfillmentEventsService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     txPrismaMock.fulfillmentEvent.create.mockReset();
+    txPrismaMock.fulfillmentEvent.findMany.mockReset();
     txPrismaMock.fulfillmentEvent.findUnique.mockReset();
     txPrismaMock.order.findUnique.mockReset();
     txPrismaMock.order.updateMany.mockReset();
@@ -647,6 +653,81 @@ describe('FulfillmentEventsService', () => {
     expect(txPrismaMock.order.updateMany).not.toHaveBeenCalled();
   });
 
+  it('lists admin fulfillment operations with order and event context', async () => {
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        FulfillmentEventsService,
+        { provide: PrismaService, useValue: prismaMock },
+        { provide: UpstreamTicketingGateway, useValue: upstreamGatewayMock },
+      ],
+    }).compile();
+
+    const service = moduleRef.get(FulfillmentEventsService);
+
+    txPrismaMock.fulfillmentEvent.findMany.mockResolvedValue([
+      {
+        externalRef: 'vendor_evt_1',
+        id: 'ful_1',
+        occurredAt: new Date('2026-04-17T12:10:00.000Z'),
+        order: {
+          id: 'ord_1',
+          items: [
+            {
+              ticketTier: {
+                name: 'Inner Field',
+                session: {
+                  event: {
+                    city: 'Shanghai',
+                    id: 'event_beta_1',
+                    title: 'Beta Concert',
+                    venueName: 'Expo Arena',
+                  },
+                },
+              },
+            },
+          ],
+          orderNumber: 'ORD-001',
+          status: 'SUBMITTED_TO_VENDOR',
+        },
+        orderId: 'ord_1',
+        payload: {
+          source: 'UPSTREAM_SUBMISSION',
+          ticketCode: 'TK-1001',
+        },
+        status: 'SUBMITTED',
+      },
+    ]);
+
+    await expect(service.listAdminOperations()).resolves.toEqual([
+      {
+        event: {
+          city: 'Shanghai',
+          id: 'event_beta_1',
+          title: 'Beta Concert',
+          venueName: 'Expo Arena',
+        },
+        externalRef: 'vendor_evt_1',
+        id: 'ful_1',
+        occurredAt: '2026-04-17T12:10:00.000Z',
+        orderId: 'ord_1',
+        orderNumber: 'ORD-001',
+        orderStatus: 'SUBMITTED_TO_VENDOR',
+        source: 'UPSTREAM_SUBMISSION',
+        status: 'SUBMITTED',
+        ticketCode: 'TK-1001',
+        tierName: 'Inner Field',
+      },
+    ]);
+
+    expect(txPrismaMock.fulfillmentEvent.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: {
+          occurredAt: 'desc',
+        },
+      }),
+    );
+  });
+
   it('accepts a valid manual issued request body at the controller boundary', () => {
     const body: unknown = {
       orderId: 'order_1003',
@@ -711,5 +792,25 @@ describe('FulfillmentEventsService', () => {
       nextStatus: 'TICKET_ISSUED',
       source: 'VENDOR_CALLBACK',
     });
+  });
+
+  it('protects manual issuance behind the admin secret guard', () => {
+    const guards =
+      Reflect.getMetadata(
+        GUARDS_METADATA,
+        FulfillmentController.prototype.recordManualIssued,
+      ) ?? [];
+
+    expect(guards).toContain(AdminApiSecretGuard);
+  });
+
+  it('protects vendor issuance callbacks behind the vendor callback secret guard', () => {
+    const guards =
+      Reflect.getMetadata(
+        GUARDS_METADATA,
+        FulfillmentController.prototype.recordVendorCallbackIssued,
+      ) ?? [];
+
+    expect(guards).toContain(VendorCallbackSecretGuard);
   });
 });

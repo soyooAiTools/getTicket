@@ -1,5 +1,14 @@
-import { BadRequestException, Body, Controller, Post } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 
+import { AdminApiSecretGuard } from '../../common/auth/admin-api-secret.guard';
+import { VendorCallbackSecretGuard } from '../../common/auth/vendor-callback-secret.guard';
 import { FulfillmentEventsService } from './fulfillment-events.service';
 
 export type ManualIssuedRequest = {
@@ -68,7 +77,16 @@ export class FulfillmentController {
     private readonly fulfillmentEventsService: FulfillmentEventsService,
   ) {}
 
+  @Get('admin')
+  @UseGuards(AdminApiSecretGuard)
+  async listAdminOperations() {
+    return {
+      items: await this.fulfillmentEventsService.listAdminOperations(),
+    };
+  }
+
   @Post('manual-issued')
+  @UseGuards(AdminApiSecretGuard)
   recordManualIssued(@Body() body: unknown) {
     assertManualIssuedRequest(body);
 
@@ -76,6 +94,7 @@ export class FulfillmentController {
   }
 
   @Post('vendor-callback-issued')
+  @UseGuards(VendorCallbackSecretGuard)
   recordVendorCallbackIssued(@Body() body: unknown) {
     assertVendorCallbackIssuedRequest(body);
 

@@ -8,6 +8,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 
+import { AdminApiSecretGuard } from '../../common/auth/admin-api-secret.guard';
 import {
   CurrentCustomer,
   type CurrentCustomerPrincipal,
@@ -74,7 +75,6 @@ function assertCreateDraftOrderInput(
   }
 }
 
-@UseGuards(CustomerSessionGuard)
 @Controller('orders')
 export class OrdersController {
   constructor(
@@ -82,7 +82,16 @@ export class OrdersController {
     private readonly ordersService: OrdersService,
   ) {}
 
+  @Get('admin')
+  @UseGuards(AdminApiSecretGuard)
+  async listAdminOrders() {
+    return {
+      items: await this.ordersService.listAdminOrders(),
+    };
+  }
+
   @Get('my')
+  @UseGuards(CustomerSessionGuard)
   async listMyOrders(@CurrentCustomer() customer: CurrentCustomerPrincipal) {
     return {
       items: await this.ordersService.listCustomerOrders(customer.id),
@@ -90,6 +99,7 @@ export class OrdersController {
   }
 
   @Get(':orderId')
+  @UseGuards(CustomerSessionGuard)
   async getMyOrder(
     @CurrentCustomer() customer: CurrentCustomerPrincipal,
     @Param('orderId') orderId: string,
@@ -98,6 +108,7 @@ export class OrdersController {
   }
 
   @Post('draft')
+  @UseGuards(CustomerSessionGuard)
   async createDraftOrder(
     @Body() body: unknown,
     @CurrentCustomer() customer: CurrentCustomerPrincipal,

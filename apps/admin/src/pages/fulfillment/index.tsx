@@ -1,35 +1,115 @@
-import { Button, Form, Input, Space, Table, Tag, Typography } from 'antd';
+import { Alert, Button, Input, Select, Space, Table, Tag, Typography } from 'antd';
+import { useEffect, useState } from 'react';
+
+import { request } from '../../services/request';
 
 type FulfillmentRow = {
+  event?: {
+    city: string;
+    id: string;
+    title: string;
+    venueName: string;
+  };
+  externalRef?: string;
   id: string;
+  occurredAt: string;
   orderId: string;
-  ticketCode: string;
-  source: 'MANUAL' | 'VENDOR_CALLBACK';
-  status: 'TICKET_ISSUED';
+  orderNumber: string;
+  orderStatus: string;
+  source?: 'MANUAL' | 'UPSTREAM_SUBMISSION' | 'VENDOR_CALLBACK';
+  status: string;
+  ticketCode?: string;
+  tierName?: string;
 };
 
-const fulfillmentRows: FulfillmentRow[] = [
-  {
-    id: 'FUL-001',
-    orderId: 'ORD-20260417-001',
-    ticketCode: 'TK-7788',
-    source: 'MANUAL',
-    status: 'TICKET_ISSUED',
-  },
-];
+const sourceMeta: Record<string, { color: string; label: string }> = {
+  MANUAL: { color: 'blue', label: 'Manual' },
+  UPSTREAM_SUBMISSION: { color: 'purple', label: 'Submitted upstream' },
+  VENDOR_CALLBACK: { color: 'cyan', label: 'Vendor callback' },
+};
 
-const sourceMeta: Record<FulfillmentRow['source'], { color: string; label: string }> =
-  {
-    MANUAL: { color: 'blue', label: '人工录入占位' },
-    VENDOR_CALLBACK: { color: 'purple', label: '厂商回调占位' },
-  };
+const fulfillmentStatusMeta: Record<string, { color: string; label: string }> = {
+  FAILED: { color: 'red', label: 'Failed' },
+  ISSUED: { color: 'green', label: 'Issued' },
+  PENDING: { color: 'default', label: 'Pending' },
+  SUBMITTED: { color: 'gold', label: 'Submitted' },
+};
 
-const statusMeta: Record<FulfillmentRow['status'], { color: string; label: string }> =
-  {
-    TICKET_ISSUED: { color: 'green', label: '已出票占位' },
-  };
+const sourceOptions = Object.entries(sourceMeta).map(([value, meta]) => ({
+  label: meta.label,
+  value,
+}));
+
+const statusOptions = Object.entries(fulfillmentStatusMeta).map(
+  ([value, meta]) => ({
+    label: meta.label,
+    value,
+  }),
+);
+
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString('zh-CN', {
+    hour12: false,
+  });
+}
 
 export function FulfillmentPage() {
+  const [rows, setRows] = useState<FulfillmentRow[]>([]);
+  const [error, setError] = useState<string>();
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
+  const [sourceFilter, setSourceFilter] = useState<string>();
+  const [statusFilter, setStatusFilter] = useState<string>();
+
+  async function loadOperations() {
+    setLoading(true);
+    setError(undefined);
+
+    try {
+      const response = await request<{ items: FulfillmentRow[] }>(
+        '/fulfillment/admin',
+      );
+      setRows(response.items ?? []);
+    } catch (loadError) {
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : 'Unable to load fulfillment operations.',
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadOperations();
+  }, []);
+
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredRows = rows.filter((row) => {
+    if (sourceFilter && row.source !== sourceFilter) {
+      return false;
+    }
+
+    if (statusFilter && row.status !== statusFilter) {
+      return false;
+    }
+
+    if (!normalizedQuery) {
+      return true;
+    }
+
+    return [
+      row.orderNumber,
+      row.orderId,
+      row.event?.title,
+      row.ticketCode,
+      row.externalRef,
+    ]
+      .filter(Boolean)
+      .some((value) => value?.toLowerCase().includes(normalizedQuery));
+  });
+
   return (
     <div style={{ padding: 24 }}>
       <Space
@@ -39,79 +119,116 @@ export function FulfillmentPage() {
       >
         <div>
           <Typography.Title level={3} style={{ marginBottom: 8 }}>
-            履约工作台
+            Fulfillment operations
           </Typography.Title>
           <Typography.Paragraph style={{ marginBottom: 0 }}>
-            人工出票与履约事件适配层骨架页，当前仅展示表单和记录列表占位。
-          </Typography.Paragraph>
-          <Typography.Paragraph type='warning' style={{ marginBottom: 0 }}>
-            当前为占位工作台，尚未接通真实出票写入，请勿将其视为已生效操作。
+            Live vendor submission and issuance activity for triaging
+            fulfillment exceptions.
           </Typography.Paragraph>
         </div>
 
-        <Form
-          layout='inline'
-          initialValues={{
-            orderId: '',
-            ticketCode: '',
-          }}
-        >
-          <Form.Item
-            label='订单号'
-            name='orderId'
-            rules={[{ required: true, message: '请输入订单号' }]}
-          >
-            <Input placeholder='请输入订单号' style={{ width: 240 }} />
-          </Form.Item>
-          <Form.Item
-            label='票码'
-            name='ticketCode'
-            rules={[{ required: true, message: '请输入票码' }]}
-          >
-            <Input placeholder='请输入票码' style={{ width: 200 }} />
-          </Form.Item>
-          <Form.Item>
-            <Button disabled type='primary' htmlType='button'>
-              确认出票（占位，暂不可用）
-            </Button>
-          </Form.Item>
-        </Form>
+        {error ? <Alert message={error} showIcon type='error' /> : null}
+
+        <Space wrap>
+          <Input
+            allowClear
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder='Search order, ticket code, event, or external ref'
+            style={{ width: 320 }}
+            value={query}
+          />
+          <Select
+            allowClear
+            onChange={(value) => setSourceFilter(value)}
+            options={sourceOptions}
+            placeholder='Filter by source'
+            style={{ width: 180 }}
+            value={sourceFilter}
+          />
+          <Select
+            allowClear
+            onChange={(value) => setStatusFilter(value)}
+            options={statusOptions}
+            placeholder='Filter by status'
+            style={{ width: 180 }}
+            value={statusFilter}
+          />
+          <Button loading={loading} onClick={() => void loadOperations()}>
+            Refresh
+          </Button>
+        </Space>
 
         <Table<FulfillmentRow>
           columns={[
             {
-              dataIndex: 'orderId',
-              key: 'orderId',
-              title: '订单号',
+              dataIndex: 'orderNumber',
+              key: 'orderNumber',
+              title: 'Order',
+              render: (_value: string, record) => (
+                <Space direction='vertical' size={0}>
+                  <Typography.Text strong>{record.orderNumber}</Typography.Text>
+                  <Typography.Text type='secondary'>
+                    {record.orderId}
+                  </Typography.Text>
+                </Space>
+              ),
             },
             {
-              dataIndex: 'ticketCode',
-              key: 'ticketCode',
-              title: '票码',
+              dataIndex: 'event',
+              key: 'event',
+              title: 'Event',
+              render: (_value: FulfillmentRow['event'], record) => (
+                <Space direction='vertical' size={0}>
+                  <Typography.Text strong>
+                    {record.event?.title ?? 'Unknown event'}
+                  </Typography.Text>
+                  <Typography.Text type='secondary'>
+                    {record.tierName ?? '-'} / {record.orderStatus}
+                  </Typography.Text>
+                </Space>
+              ),
             },
             {
               dataIndex: 'source',
               key: 'source',
-              title: '来源',
-              render: (source: FulfillmentRow['source']) => {
-                const meta = sourceMeta[source];
-
-                return <Tag color={meta.color}>{meta.label}</Tag>;
-              },
+              title: 'Source',
+              render: (value: FulfillmentRow['source']) => (
+                <Tag color={sourceMeta[value ?? '']?.color ?? 'default'}>
+                  {sourceMeta[value ?? '']?.label ?? value ?? 'Unknown'}
+                </Tag>
+              ),
             },
             {
               dataIndex: 'status',
               key: 'status',
-              title: '状态',
-              render: (status: FulfillmentRow['status']) => {
-                const meta = statusMeta[status];
-
-                return <Tag color={meta.color}>{meta.label}</Tag>;
-              },
+              title: 'Fulfillment status',
+              render: (value: string) => (
+                <Tag color={fulfillmentStatusMeta[value]?.color ?? 'default'}>
+                  {fulfillmentStatusMeta[value]?.label ?? value}
+                </Tag>
+              ),
+            },
+            {
+              dataIndex: 'ticketCode',
+              key: 'ticketCode',
+              title: 'Ticket code',
+              render: (value?: string) => value ?? '-',
+            },
+            {
+              dataIndex: 'externalRef',
+              key: 'externalRef',
+              title: 'External ref',
+              render: (value?: string) => value ?? '-',
+            },
+            {
+              dataIndex: 'occurredAt',
+              key: 'occurredAt',
+              title: 'Occurred at',
+              render: (value: string) => formatDateTime(value),
             },
           ]}
-          dataSource={fulfillmentRows}
-          pagination={false}
+          dataSource={filteredRows}
+          loading={loading}
           rowKey='id'
         />
       </Space>

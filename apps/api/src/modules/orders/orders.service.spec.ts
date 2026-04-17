@@ -213,4 +213,95 @@ describe('OrdersService', () => {
       service.getCustomerOrderDetail('cust_1', 'ord_missing'),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
+
+  it('lists admin orders with event, payment, and refund summaries', async () => {
+    (prismaMock.order.findMany as jest.Mock).mockResolvedValue([
+      {
+        createdAt: new Date('2026-04-17T12:00:00.000Z'),
+        currency: 'CNY',
+        id: 'ord_admin_1',
+        items: [
+          {
+            quantity: 2,
+            ticketTier: {
+              name: 'Inner Field',
+              session: {
+                id: 'session_1',
+                name: '2026-05-01 19:30',
+                event: {
+                  city: 'Shanghai',
+                  coverImageUrl: null,
+                  id: 'event_beta_1',
+                  minPrice: 79900,
+                  refundEntryEnabled: true,
+                  saleStatus: 'ON_SALE',
+                  title: 'Beta Concert',
+                  venueName: 'Expo Arena',
+                },
+              },
+            },
+          },
+        ],
+        orderNumber: 'ORD-001',
+        payments: [
+          {
+            paidAt: new Date('2026-04-17T12:05:00.000Z'),
+            providerTxnId: 'wx_txn_1',
+            status: 'SUCCEEDED',
+          },
+        ],
+        refundRequests: [
+          {
+            refundNo: 'RFD-001',
+            status: 'PROCESSING',
+          },
+        ],
+        status: 'PAID_PENDING_FULFILLMENT',
+        ticketType: 'E_TICKET',
+        totalAmount: 159800,
+        userId: 'cust_1',
+      },
+    ]);
+
+    const service = new OrdersService(
+      prismaMock,
+      orderTimelineServiceMock as unknown as OrderTimelineService,
+    );
+
+    await expect(service.listAdminOrders()).resolves.toEqual([
+      {
+        createdAt: '2026-04-17T12:00:00.000Z',
+        currency: 'CNY',
+        event: {
+          city: 'Shanghai',
+          id: 'event_beta_1',
+          title: 'Beta Concert',
+          venueName: 'Expo Arena',
+        },
+        id: 'ord_admin_1',
+        itemCount: 2,
+        latestPayment: {
+          paidAt: '2026-04-17T12:05:00.000Z',
+          providerTxnId: 'wx_txn_1',
+          status: 'SUCCEEDED',
+        },
+        latestRefundRequest: {
+          refundNo: 'RFD-001',
+          status: 'PROCESSING',
+        },
+        orderNumber: 'ORD-001',
+        sessionName: '2026-05-01 19:30',
+        status: 'PAID_PENDING_FULFILLMENT',
+        ticketType: 'E_TICKET',
+        totalAmount: 159800,
+        userId: 'cust_1',
+      },
+    ]);
+
+    expect(prismaMock.order.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: { createdAt: 'desc' },
+      }),
+    );
+  });
 });

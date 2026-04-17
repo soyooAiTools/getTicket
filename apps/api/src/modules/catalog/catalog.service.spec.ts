@@ -94,6 +94,58 @@ describe('CatalogService', () => {
     ]);
   });
 
+  it('reads admin event operations without filtering unpublished events', async () => {
+    (prismaMock.event.findMany as jest.Mock).mockResolvedValue([
+      {
+        id: 'event-1003',
+        title: 'Internal Beta Hold',
+        city: 'Shanghai',
+        venueName: 'Expo Arena',
+        description: null,
+        saleStatus: 'UPCOMING',
+        minPrice: 399,
+        coverImageUrl: null,
+        published: false,
+        refundEntryEnabled: false,
+      },
+    ]);
+
+    const service = new CatalogService(prismaMock);
+    const result = await service.listAdminEvents();
+
+    expect(prismaMock.event.findMany).toHaveBeenCalledWith({
+      orderBy: {
+        createdAt: 'desc',
+      },
+      select: {
+        city: true,
+        coverImageUrl: true,
+        description: true,
+        id: true,
+        minPrice: true,
+        published: true,
+        refundEntryEnabled: true,
+        saleStatus: true,
+        title: true,
+        venueName: true,
+      },
+    });
+    expect(result).toEqual([
+      {
+        id: 'event-1003',
+        title: 'Internal Beta Hold',
+        city: 'Shanghai',
+        venueName: 'Expo Arena',
+        description: undefined,
+        coverImageUrl: undefined,
+        saleStatus: 'UPCOMING',
+        minPrice: 399,
+        published: false,
+        refundEntryEnabled: false,
+      },
+    ]);
+  });
+
   it('returns a published event detail with sessions and ticket tiers', async () => {
     (prismaMock.event.findFirst as jest.Mock).mockResolvedValue({
       id: 'event-1001',
@@ -356,6 +408,7 @@ describe('CatalogService', () => {
 
 describe('CatalogController', () => {
   const catalogServiceMock = {
+    listAdminEvents: jest.fn(),
     listPublishedEvents: jest.fn(),
     getEventDetail: jest.fn(),
     updateEventOperations: jest.fn(),
@@ -395,6 +448,42 @@ describe('CatalogController', () => {
           saleStatus: 'ON_SALE',
           minPrice: 399,
           published: true,
+          refundEntryEnabled: false,
+        },
+      ],
+    });
+  });
+
+  it('returns admin catalog items from the service', async () => {
+    (catalogServiceMock.listAdminEvents as jest.Mock).mockResolvedValue([
+      {
+        id: 'event-1003',
+        title: 'Internal Beta Hold',
+        city: 'Shanghai',
+        venueName: 'Expo Arena',
+        description: undefined,
+        saleStatus: 'UPCOMING',
+        minPrice: 399,
+        published: false,
+        refundEntryEnabled: false,
+      },
+    ]);
+
+    const controller = new CatalogController(catalogServiceMock);
+    const result = await controller.listAdminEvents();
+
+    expect(catalogServiceMock.listAdminEvents).toHaveBeenCalled();
+    expect(result).toEqual({
+      items: [
+        {
+          id: 'event-1003',
+          title: 'Internal Beta Hold',
+          city: 'Shanghai',
+          venueName: 'Expo Arena',
+          description: undefined,
+          saleStatus: 'UPCOMING',
+          minPrice: 399,
+          published: false,
           refundEntryEnabled: false,
         },
       ],
@@ -488,6 +577,16 @@ describe('CatalogController', () => {
       Reflect.getMetadata(
         GUARDS_METADATA,
         CatalogController.prototype.updateEventOperations,
+      ) ?? [];
+
+    expect(guards).toContain(AdminApiSecretGuard);
+  });
+
+  it('protects the admin catalog list route with the admin secret guard', () => {
+    const guards =
+      Reflect.getMetadata(
+        GUARDS_METADATA,
+        CatalogController.prototype.listAdminEvents,
       ) ?? [];
 
     expect(guards).toContain(AdminApiSecretGuard);

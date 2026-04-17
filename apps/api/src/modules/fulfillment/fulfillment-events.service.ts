@@ -39,6 +39,49 @@ type FulfillmentPayload = {
   vendorEventId?: string;
 };
 
+type AdminFulfillmentEventSummary = {
+  city: string;
+  id: string;
+  title: string;
+  venueName: string;
+};
+
+type PrismaAdminFulfillmentEvent = {
+  externalRef: string | null;
+  id: string;
+  occurredAt: Date;
+  order: {
+    id: string;
+    items: Array<{
+      ticketTier: {
+        name: string;
+        session: {
+          event: AdminFulfillmentEventSummary;
+        };
+      };
+    }>;
+    orderNumber: string;
+    status: OrderStatus;
+  };
+  orderId: string;
+  payload: unknown;
+  status: string;
+};
+
+export type AdminFulfillmentOperationItem = {
+  event?: AdminFulfillmentEventSummary;
+  externalRef?: string;
+  id: string;
+  occurredAt: string;
+  orderId: string;
+  orderNumber: string;
+  orderStatus: OrderStatus;
+  source?: FulfillmentEventSource;
+  status: string;
+  ticketCode?: string;
+  tierName?: string;
+};
+
 @Injectable()
 export class FulfillmentEventsService {
   constructor(
@@ -219,6 +262,66 @@ export class FulfillmentEventsService {
         ...input,
         nextStatus: issuanceOutcome.status,
         source: 'VENDOR_CALLBACK',
+      };
+    });
+  }
+
+  async listAdminOperations(): Promise<AdminFulfillmentOperationItem[]> {
+    const events = await this.prisma.fulfillmentEvent.findMany({
+      include: {
+        order: {
+          select: {
+            id: true,
+            items: {
+              orderBy: {
+                createdAt: 'asc',
+              },
+              select: {
+                ticketTier: {
+                  select: {
+                    name: true,
+                    session: {
+                      select: {
+                        event: {
+                          select: {
+                            city: true,
+                            id: true,
+                            title: true,
+                            venueName: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            orderNumber: true,
+            status: true,
+          },
+        },
+      },
+      orderBy: {
+        occurredAt: 'desc',
+      },
+    });
+
+    return events.map((event: PrismaAdminFulfillmentEvent) => {
+      const payload = this.readAdminPayload(event.payload);
+      const firstItem = event.order.items[0];
+
+      return {
+        event: firstItem?.ticketTier.session.event,
+        externalRef: event.externalRef ?? undefined,
+        id: event.id,
+        occurredAt: event.occurredAt.toISOString(),
+        orderId: event.orderId,
+        orderNumber: event.order.orderNumber,
+        orderStatus: event.order.status,
+        source: payload.source,
+        status: event.status,
+        ticketCode: payload.ticketCode,
+        tierName: firstItem?.ticketTier.name,
       };
     });
   }
@@ -431,6 +534,24 @@ export class FulfillmentEventsService {
       ticketCode,
       vendorEventId:
         typeof vendorEventId === 'string' ? vendorEventId : undefined,
+    };
+  }
+
+  private readAdminPayload(payload: unknown): {
+    source?: FulfillmentEventSource;
+    ticketCode?: string;
+  } {
+    if (!payload || typeof payload !== 'object') {
+      return {};
+    }
+
+    const typedPayload = payload as Record<string, unknown>;
+    const source = typedPayload.source;
+    const ticketCode = typedPayload.ticketCode;
+
+    return {
+      source: typeof source === 'string' ? (source as FulfillmentEventSource) : undefined,
+      ticketCode: typeof ticketCode === 'string' ? ticketCode : undefined,
     };
   }
 }

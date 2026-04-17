@@ -11,6 +11,8 @@ coverage
 pnpm-debug.log*
 *.log
 *.tsbuildinfo
+package-lock.json
+.swc/
 .codex-temp/
 .codex_tmp_openai_skills/
 .codex_tmp_openai_skills.zip

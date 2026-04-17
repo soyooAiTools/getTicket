@@ -1,37 +1,101 @@
-import { Button, Space, Table, Tag, Typography } from 'antd';
+import { Alert, Button, Select, Space, Switch, Table, Tag, Typography } from 'antd';
+import { useEffect, useState } from 'react';
+
+import { jsonRequest, request } from '../../services/request';
+
+type SaleStatus = 'UPCOMING' | 'ON_SALE' | 'SOLD_OUT';
 
 type EventRow = {
-  id: string;
-  title: string;
   city: string;
-  saleStatus: 'UPCOMING' | 'ON_SALE' | 'SOLD_OUT';
+  id: string;
+  minPrice: number;
+  published: boolean;
+  refundEntryEnabled: boolean;
+  saleStatus: SaleStatus;
+  title: string;
+  venueName: string;
 };
 
-const eventRows: EventRow[] = [
-  {
-    id: 'event-1001',
-    title: '\u767d\u663c\u620f\u5267\u8282',
-    city: '\u676d\u5dde',
-    saleStatus: 'ON_SALE',
-  },
-  {
-    id: 'event-1002',
-    title: '\u94f6\u6cb3\u5217\u8f66\u97f3\u4e50\u4f1a',
-    city: '\u4e0a\u6d77',
-    saleStatus: 'UPCOMING',
-  },
+const saleStatusMeta: Record<SaleStatus, { color: string; label: string }> = {
+  ON_SALE: { color: 'green', label: 'On sale' },
+  SOLD_OUT: { color: 'red', label: 'Sold out' },
+  UPCOMING: { color: 'gold', label: 'Upcoming' },
+};
+
+const saleStatusOptions: Array<{ label: string; value: SaleStatus }> = [
+  { label: 'Upcoming', value: 'UPCOMING' },
+  { label: 'On sale', value: 'ON_SALE' },
+  { label: 'Sold out', value: 'SOLD_OUT' },
 ];
 
-const saleStatusMeta: Record<
-  EventRow['saleStatus'],
-  { color: string; label: string }
-> = {
-  ON_SALE: { color: 'green', label: '\u552e\u7968\u4e2d' },
-  SOLD_OUT: { color: 'red', label: '\u5df2\u552e\u7f44' },
-  UPCOMING: { color: 'gold', label: '\u5f85\u5f00\u552e' },
-};
+function formatCurrency(amount: number) {
+  return new Intl.NumberFormat('zh-CN', {
+    currency: 'CNY',
+    style: 'currency',
+  }).format(amount / 100);
+}
 
 export function EventsPage() {
+  const [rows, setRows] = useState<EventRow[]>([]);
+  const [error, setError] = useState<string>();
+  const [loading, setLoading] = useState(true);
+  const [pendingKey, setPendingKey] = useState<string>();
+
+  async function loadEvents() {
+    setLoading(true);
+    setError(undefined);
+
+    try {
+      const response = await request<{ items: EventRow[] }>(
+        '/catalog/admin/events',
+      );
+      setRows(response.items ?? []);
+    } catch (loadError) {
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : 'Unable to load events.',
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadEvents();
+  }, []);
+
+  async function updateEvent(
+    eventId: string,
+    patch: Partial<
+      Pick<EventRow, 'published' | 'refundEntryEnabled' | 'saleStatus'>
+    >,
+    actionLabel: string,
+  ) {
+    setPendingKey(`${eventId}:${actionLabel}`);
+    setError(undefined);
+
+    try {
+      const updatedEvent = await jsonRequest<EventRow>(
+        `/catalog/admin/events/${eventId}`,
+        'PATCH',
+        patch,
+      );
+
+      setRows((currentRows) =>
+        currentRows.map((row) => (row.id === eventId ? updatedEvent : row)),
+      );
+    } catch (updateError) {
+      setError(
+        updateError instanceof Error
+          ? updateError.message
+          : `Unable to ${actionLabel.toLowerCase()}.`,
+      );
+    } finally {
+      setPendingKey(undefined);
+    }
+  }
+
   return (
     <div style={{ padding: 24 }}>
       <Space
@@ -41,52 +105,107 @@ export function EventsPage() {
       >
         <div>
           <Typography.Title level={3} style={{ marginBottom: 8 }}>
-            {'\u6f14\u51fa\u7ba1\u7406'}
+            Event operations
           </Typography.Title>
           <Typography.Paragraph style={{ marginBottom: 0 }}>
-            {
-              '\u540e\u53f0 CMS \u6f14\u51fa\u4fe1\u606f\u6d4f\u89c8\u9aa8\u67b6\uff0c\u540e\u7eed\u53ef\u63a5\u5165\u771f\u5b9e\u68c0\u7d22\u3001\u7f16\u8f91\u4e0e\u4e0a\u4e0b\u67b6\u6d41\u7a0b\u3002'
-            }
+            Live catalog operations for the beta event, including publish state,
+            sale state, and refund entry.
           </Typography.Paragraph>
         </div>
+
+        {error ? <Alert message={error} showIcon type='error' /> : null}
+
+        <Space>
+          <Button loading={loading} onClick={() => void loadEvents()}>
+            Refresh
+          </Button>
+        </Space>
 
         <Table<EventRow>
           columns={[
             {
               dataIndex: 'title',
               key: 'title',
-              title: '\u6f14\u51fa\u540d\u79f0',
+              title: 'Event',
+              render: (_value: string, record) => (
+                <Space direction='vertical' size={0}>
+                  <Typography.Text strong>{record.title}</Typography.Text>
+                  <Typography.Text type='secondary'>
+                    {record.city} / {record.venueName}
+                  </Typography.Text>
+                </Space>
+              ),
             },
             {
-              dataIndex: 'city',
-              key: 'city',
-              title: '\u57ce\u5e02',
+              dataIndex: 'minPrice',
+              key: 'minPrice',
+              title: 'Min price',
+              render: (value: number) => formatCurrency(value),
+            },
+            {
+              dataIndex: 'published',
+              key: 'published',
+              title: 'Published',
+              render: (value: boolean, record) => (
+                <Switch
+                  checked={value}
+                  checkedChildren='On'
+                  loading={pendingKey === `${record.id}:publish`}
+                  onChange={(checked) =>
+                    void updateEvent(record.id, { published: checked }, 'publish')
+                  }
+                  unCheckedChildren='Off'
+                />
+              ),
             },
             {
               dataIndex: 'saleStatus',
               key: 'saleStatus',
-              title: '\u552e\u5356\u72b6\u6001',
-              render: (saleStatus: EventRow['saleStatus']) => {
-                const meta = saleStatusMeta[saleStatus];
-
-                return <Tag color={meta.color}>{meta.label}</Tag>;
-              },
-            },
-            {
-              key: 'actions',
-              title: '\u64cd\u4f5c',
-              render: (_, record) => (
+              title: 'Sale status',
+              render: (value: SaleStatus, record) => (
                 <Space>
-                  <Button type='link'>{'\u67e5\u770b'}</Button>
-                  <Button type='link'>{'\u7f16\u8f91'}</Button>
-                  <Button type='link' disabled={record.saleStatus === 'SOLD_OUT'}>
-                    {'\u4e0a\u4e0b\u67b6'}
-                  </Button>
+                  <Tag color={saleStatusMeta[value].color}>
+                    {saleStatusMeta[value].label}
+                  </Tag>
+                  <Select<SaleStatus>
+                    onChange={(nextValue) =>
+                      void updateEvent(
+                        record.id,
+                        { saleStatus: nextValue },
+                        'sale status',
+                      )
+                    }
+                    options={saleStatusOptions}
+                    size='small'
+                    style={{ width: 132 }}
+                    value={value}
+                  />
                 </Space>
               ),
             },
+            {
+              dataIndex: 'refundEntryEnabled',
+              key: 'refundEntryEnabled',
+              title: 'Refund entry',
+              render: (value: boolean, record) => (
+                <Switch
+                  checked={value}
+                  checkedChildren='Open'
+                  loading={pendingKey === `${record.id}:refund`}
+                  onChange={(checked) =>
+                    void updateEvent(
+                      record.id,
+                      { refundEntryEnabled: checked },
+                      'refund',
+                    )
+                  }
+                  unCheckedChildren='Closed'
+                />
+              ),
+            },
           ]}
-          dataSource={eventRows}
+          dataSource={rows}
+          loading={loading}
           pagination={false}
           rowKey='id'
         />

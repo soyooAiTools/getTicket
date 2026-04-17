@@ -18,6 +18,14 @@ import { CatalogService } from './catalog.service';
 export class CatalogController {
   constructor(private readonly catalogService: CatalogService) {}
 
+  @Get('admin/events')
+  @UseGuards(AdminApiSecretGuard)
+  async listAdminEvents() {
+    return {
+      items: await this.catalogService.listAdminEvents(),
+    };
+  }
+
   @Get('events')
   async listEvents() {
     return {

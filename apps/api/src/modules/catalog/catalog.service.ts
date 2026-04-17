@@ -148,6 +148,17 @@ export class CatalogService {
     return events.map(normalizeCatalogEvent);
   }
 
+  async listAdminEvents(): Promise<EventCatalogSummary[]> {
+    const events = await this.prisma.event.findMany({
+      orderBy: {
+        createdAt: 'desc',
+      },
+      select: publishedEventSelect,
+    });
+
+    return events.map(normalizeCatalogEvent);
+  }
+
   async getEventDetail(eventId: string): Promise<EventDetail> {
     const event = await this.prisma.event.findFirst({
       orderBy: {
