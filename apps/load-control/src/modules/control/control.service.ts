@@ -63,6 +63,11 @@ export class ControlService {
     const draft = isDraft ? input : null;
     const definition: LoadTestRunDefinition = isDraft ? input.definition : input;
     const runId = input.id;
+
+    if (draft && draft.id !== draft.definition.id) {
+      throw new BadRequestException('Run draft id must match definition.id.');
+    }
+
     const run: StoredRun = {
       definition,
       status: 'DRAFT',

@@ -605,7 +605,7 @@ describe('shared contracts', () => {
         templateId: 'template-preprod-01',
         nodePoolId: 'pool-hk-anchor',
         definition: {
-          id: 'run_preprod_20260417_001',
+          id: 'run-control-01',
           mode: 'PREPROD',
           targetBaseUrl: 'https://preprod-api.example.com',
           inventoryPoolId: 'inventory-main',
@@ -653,6 +653,60 @@ describe('shared contracts', () => {
       id: 'run-control-01',
       templateId: 'template-preprod-01',
     });
+  });
+
+  it('rejects a control run draft payload when draft.id mismatches definition.id', () => {
+    expect(() =>
+      controlRunDraftSchema.parse({
+        id: 'run-control-01',
+        templateId: 'template-preprod-01',
+        nodePoolId: 'pool-hk-anchor',
+        definition: {
+          id: 'run-control-02',
+          mode: 'PREPROD',
+          targetBaseUrl: 'https://preprod-api.example.com',
+          inventoryPoolId: 'inventory-main',
+          maxGlobalQps: 2400,
+          maxNodeConcurrency: 180,
+          tags: {
+            release: '2026-04-18',
+          },
+          requestTemplates: {
+            query: {
+              method: 'GET',
+              path: '/api/catalog/events',
+              timeoutMs: 1500,
+            },
+            queue: {
+              method: 'GET',
+              path: '/api/queue/status',
+              timeoutMs: 1500,
+            },
+            inventoryLock: {
+              method: 'POST',
+              path: '/api/checkout/draft-orders',
+              timeoutMs: 2500,
+            },
+            orderSubmit: {
+              method: 'POST',
+              path: '/api/orders/submit',
+              timeoutMs: 2500,
+            },
+          },
+          phases: [
+            {
+              id: 'warmup',
+              startsAtOffsetMs: 0,
+              durationMs: 1500000,
+              queryConcurrency: 30,
+              queuePollingConcurrency: 0,
+              inventoryLockConcurrency: 0,
+              orderSubmissionConcurrency: 0,
+            },
+          ],
+        },
+      }),
+    ).toThrow('Run draft id must match definition.id.');
   });
 
   it('validates a control run record payload', () => {

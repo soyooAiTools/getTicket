@@ -155,7 +155,18 @@ export const controlRunDraftSchema = z
     nodePoolId: z.string().min(1),
     definition: loadTestRunDefinitionSchema,
   })
-  .strict();
+  .strict()
+  .superRefine((draft, context) => {
+    if (draft.id === draft.definition.id) {
+      return;
+    }
+
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Run draft id must match definition.id.',
+      path: ['definition', 'id'],
+    });
+  });
 
 export const controlRunRecordSchema = z
   .object({
