@@ -111,6 +111,109 @@ export const nodeRunSummarySchema = z
   })
   .strict();
 
+export const runStatusSchema = z.enum([
+  'DRAFT',
+  'PLANNED',
+  'RUNNING',
+  'PAUSED',
+  'COMPLETED',
+  'FAILED',
+  'CANCELLED',
+]);
+
+export const nodeHealthStatusSchema = z.enum([
+  'UNKNOWN',
+  'HEALTHY',
+  'DEGRADED',
+  'UNHEALTHY',
+  'OFFLINE',
+]);
+
+export const scenarioTemplateStatusSchema = z.enum([
+  'DRAFT',
+  'ACTIVE',
+  'ARCHIVED',
+]);
+
+export const scenarioTemplateSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    description: z.string().min(1).optional(),
+    status: scenarioTemplateStatusSchema,
+    targetBaseUrl: z.string().url(),
+    nodePoolId: z.string().min(1),
+    tags: z.record(z.string(), z.string()),
+    requestTemplates: requestTemplatesSchema,
+    phases: z.array(scenarioPhaseSchema).min(1),
+  })
+  .strict();
+
+export const nodePoolSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    region: z.string().min(1),
+    role: nodeRoleSchema,
+    status: nodeHealthStatusSchema,
+    maxConcurrency: z.number().int().positive(),
+    nodeCount: z.number().int().nonnegative(),
+    activeNodeCount: z.number().int().nonnegative(),
+    networkProfile: networkProfileSchema.optional(),
+    labels: z.record(z.string(), z.string()),
+  })
+  .strict();
+
+export const controlRunDraftSchema = z
+  .object({
+    id: z.string().min(1),
+    templateId: z.string().min(1),
+    nodePoolId: z.string().min(1),
+    status: runStatusSchema,
+    requestedBy: z.string().min(1),
+    requestedAt: z.string().datetime(),
+    tags: z.record(z.string(), z.string()),
+  })
+  .strict();
+
+export const controlRunRecordSchema = controlRunDraftSchema
+  .extend({
+    startedAt: z.string().datetime().nullable(),
+    completedAt: z.string().datetime().nullable(),
+  })
+  .strict();
+
+export const nodeTelemetrySampleSchema = z
+  .object({
+    runId: z.string().min(1),
+    nodeId: z.string().min(1),
+    poolId: z.string().min(1),
+    capturedAt: z.string().datetime(),
+    status: nodeHealthStatusSchema,
+    qps: z.number().nonnegative(),
+    errorRate: z.number().min(0).max(1),
+    p50LatencyMs: z.number().nonnegative(),
+    p95LatencyMs: z.number().nonnegative(),
+    activeRequests: z.number().int().nonnegative(),
+  })
+  .strict();
+
+export const liveRunSnapshotSchema = z
+  .object({
+    run: controlRunRecordSchema,
+    nodePool: nodePoolSchema,
+    telemetrySamples: z.array(nodeTelemetrySampleSchema),
+    capturedAt: z.string().datetime(),
+    currentPhaseId: z.string().min(1),
+    activeNodeCount: z.number().int().nonnegative(),
+    unhealthyNodeCount: z.number().int().nonnegative(),
+    aggregateQps: z.number().nonnegative(),
+    aggregateErrorRate: z.number().min(0).max(1),
+    aggregateP50LatencyMs: z.number().nonnegative(),
+    aggregateP95LatencyMs: z.number().nonnegative(),
+  })
+  .strict();
+
 export const calibrationRecommendationSchema = z
   .object({
     field: z.string().min(1),
@@ -142,6 +245,17 @@ export type LoadTestRunDefinition = z.infer<typeof loadTestRunDefinitionSchema>;
 export type PlannedNodeAssignment = z.infer<typeof plannedNodeAssignmentSchema>;
 export type PhaseSummary = z.infer<typeof phaseSummarySchema>;
 export type NodeRunSummary = z.infer<typeof nodeRunSummarySchema>;
+export type RunStatus = z.infer<typeof runStatusSchema>;
+export type NodeHealthStatus = z.infer<typeof nodeHealthStatusSchema>;
+export type ScenarioTemplateStatus = z.infer<
+  typeof scenarioTemplateStatusSchema
+>;
+export type ScenarioTemplate = z.infer<typeof scenarioTemplateSchema>;
+export type NodePool = z.infer<typeof nodePoolSchema>;
+export type ControlRunDraft = z.infer<typeof controlRunDraftSchema>;
+export type ControlRunRecord = z.infer<typeof controlRunRecordSchema>;
+export type NodeTelemetrySample = z.infer<typeof nodeTelemetrySampleSchema>;
+export type LiveRunSnapshot = z.infer<typeof liveRunSnapshotSchema>;
 export type CalibrationRecommendation = z.infer<
   typeof calibrationRecommendationSchema
 >;

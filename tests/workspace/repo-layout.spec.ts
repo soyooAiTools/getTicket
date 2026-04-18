@@ -15,6 +15,7 @@ describe('repo layout', () => {
     expect(existsSync('docker-compose.yml')).toBe(true);
     expect(existsSync('apps/api/package.json')).toBe(true);
     expect(existsSync('apps/load-control/package.json')).toBe(true);
+    expect(existsSync('apps/load-control/prisma/schema.prisma')).toBe(true);
     expect(existsSync('apps/admin/package.json')).toBe(true);
     expect(existsSync('apps/miniapp/package.json')).toBe(true);
     expect(existsSync('packages/contracts/package.json')).toBe(true);
@@ -49,8 +50,17 @@ describe('repo layout', () => {
       'dev:agent': 'ts-node src/agent/main.ts',
       test: 'jest',
       'test:e2e': 'jest --config test/jest-e2e.json',
+      'prisma:generate': 'prisma generate',
+      'prisma:migrate': 'prisma migrate dev',
       lint: 'eslint src test --ext .ts',
     });
+    expect(
+      readJson<{ dependencies: Record<string, string> }>('apps/load-control/package.json').dependencies,
+    ).toEqual(
+      expect.objectContaining({
+        ioredis: expect.any(String),
+      }),
+    );
 
     const tsconfig = readJson<{
       compilerOptions: {

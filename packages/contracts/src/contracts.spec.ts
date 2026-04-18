@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  controlRunDraftSchema,
+  controlRunRecordSchema,
   calibrationReportSchema,
   eventCatalogSummarySchema,
   eventDetailSchema,
@@ -9,10 +11,16 @@ import {
   orderDetailSchema,
   orderListItemSchema,
   orderTimelineItemSchema,
+  liveRunSnapshotSchema,
+  nodeHealthStatusSchema,
+  nodePoolSchema,
+  nodeTelemetrySampleSchema,
   ticketTierSummarySchema,
   loadTestRunDefinitionSchema,
   networkProfileSchema,
   miniappSessionSchema,
+  runStatusSchema,
+  scenarioTemplateSchema,
   wechatPaymentIntentSchema,
   viewerSchema,
 } from './index';
@@ -447,6 +455,210 @@ describe('shared contracts', () => {
     ).toMatchObject({
       id: 'hk-anchor',
       baseLatencyMs: 18,
+    });
+  });
+
+  it('validates a scenario template payload', () => {
+    expect(
+      scenarioTemplateSchema.parse({
+        id: 'template-preprod-01',
+        name: 'Preprod release window',
+        description: 'Baseline release-window template.',
+        status: 'ACTIVE',
+        targetBaseUrl: 'https://preprod-api.example.com',
+        nodePoolId: 'pool-hk-anchor',
+        tags: {
+          cohort: 'release-window',
+        },
+        requestTemplates: {
+          query: {
+            method: 'GET',
+            path: '/api/catalog/events',
+            timeoutMs: 1500,
+          },
+          queue: {
+            method: 'GET',
+            path: '/api/queue/status',
+            timeoutMs: 1500,
+          },
+          inventoryLock: {
+            method: 'POST',
+            path: '/api/checkout/draft-orders',
+            timeoutMs: 2500,
+          },
+          orderSubmit: {
+            method: 'POST',
+            path: '/api/orders/submit',
+            timeoutMs: 2500,
+          },
+        },
+        phases: [
+          {
+            id: 'warmup',
+            startsAtOffsetMs: 0,
+            durationMs: 1500000,
+            queryConcurrency: 30,
+            queuePollingConcurrency: 0,
+            inventoryLockConcurrency: 0,
+            orderSubmissionConcurrency: 0,
+          },
+        ],
+      }),
+    ).toMatchObject({
+      id: 'template-preprod-01',
+      status: 'ACTIVE',
+      nodePoolId: 'pool-hk-anchor',
+    });
+  });
+
+  it('validates a node pool payload', () => {
+    expect(
+      nodePoolSchema.parse({
+        id: 'pool-hk-anchor',
+        name: 'Hong Kong anchor pool',
+        region: 'hk',
+        role: 'ANCHOR',
+        status: 'HEALTHY',
+        maxConcurrency: 180,
+        nodeCount: 1,
+        activeNodeCount: 1,
+        labels: {
+          tier: 'primary',
+        },
+      }),
+    ).toMatchObject({
+      id: 'pool-hk-anchor',
+      status: 'HEALTHY',
+      nodeCount: 1,
+    });
+  });
+
+  it('validates a control run draft payload', () => {
+    expect(
+      controlRunDraftSchema.parse({
+        id: 'run-control-01',
+        templateId: 'template-preprod-01',
+        nodePoolId: 'pool-hk-anchor',
+        status: 'DRAFT',
+        requestedBy: 'ops@example.com',
+        requestedAt: '2026-04-18T09:30:00.000Z',
+        tags: {
+          release: '2026-04-18',
+        },
+      }),
+    ).toMatchObject({
+      id: 'run-control-01',
+      status: 'DRAFT',
+      templateId: 'template-preprod-01',
+    });
+  });
+
+  it('validates a control run record payload', () => {
+    expect(
+      controlRunRecordSchema.parse({
+        id: 'run-control-01',
+        templateId: 'template-preprod-01',
+        nodePoolId: 'pool-hk-anchor',
+        status: 'RUNNING',
+        requestedBy: 'ops@example.com',
+        requestedAt: '2026-04-18T09:30:00.000Z',
+        startedAt: '2026-04-18T09:35:00.000Z',
+        completedAt: null,
+        tags: {
+          release: '2026-04-18',
+        },
+      }),
+    ).toMatchObject({
+      status: 'RUNNING',
+      nodePoolId: 'pool-hk-anchor',
+    });
+  });
+
+  it('validates a node health status payload through the planned symbol', () => {
+    expect(nodeHealthStatusSchema.parse('HEALTHY')).toBe('HEALTHY');
+    expect(runStatusSchema.parse('PLANNED')).toBe('PLANNED');
+  });
+
+  it('validates a node telemetry sample payload', () => {
+    expect(
+      nodeTelemetrySampleSchema.parse({
+        runId: 'run-control-01',
+        nodeId: 'node-hk-1',
+        poolId: 'pool-hk-anchor',
+        capturedAt: '2026-04-18T09:40:00.000Z',
+        status: 'HEALTHY',
+        qps: 218.5,
+        errorRate: 0.012,
+        p50LatencyMs: 185,
+        p95LatencyMs: 240,
+        activeRequests: 28,
+      }),
+    ).toMatchObject({
+      runId: 'run-control-01',
+      status: 'HEALTHY',
+      qps: 218.5,
+    });
+  });
+
+  it('validates a live run snapshot payload', () => {
+    expect(
+      liveRunSnapshotSchema.parse({
+        run: {
+          id: 'run-control-01',
+          templateId: 'template-preprod-01',
+          nodePoolId: 'pool-hk-anchor',
+          status: 'RUNNING',
+          requestedBy: 'ops@example.com',
+          requestedAt: '2026-04-18T09:30:00.000Z',
+          startedAt: '2026-04-18T09:35:00.000Z',
+          completedAt: null,
+          tags: {
+            release: '2026-04-18',
+          },
+        },
+        nodePool: {
+          id: 'pool-hk-anchor',
+          name: 'Hong Kong anchor pool',
+          region: 'hk',
+          role: 'ANCHOR',
+          status: 'HEALTHY',
+          maxConcurrency: 180,
+          nodeCount: 1,
+          activeNodeCount: 1,
+          labels: {
+            tier: 'primary',
+          },
+        },
+        telemetrySamples: [
+          {
+            runId: 'run-control-01',
+            nodeId: 'node-hk-1',
+            poolId: 'pool-hk-anchor',
+            capturedAt: '2026-04-18T09:40:00.000Z',
+            status: 'HEALTHY',
+            qps: 218.5,
+            errorRate: 0.012,
+            p50LatencyMs: 185,
+            p95LatencyMs: 240,
+            activeRequests: 28,
+          },
+        ],
+        capturedAt: '2026-04-18T09:40:00.000Z',
+        currentPhaseId: 'peak',
+        activeNodeCount: 1,
+        unhealthyNodeCount: 0,
+        aggregateQps: 218.5,
+        aggregateErrorRate: 0.012,
+        aggregateP50LatencyMs: 185,
+        aggregateP95LatencyMs: 240,
+      }),
+    ).toMatchObject({
+      run: {
+        status: 'RUNNING',
+      },
+      nodePool: {
+        id: 'pool-hk-anchor',
+      },
     });
   });
 

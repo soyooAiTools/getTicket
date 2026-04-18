@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
+  liveRunSnapshotSchema,
   loadTestRunDefinitionSchema,
   networkProfileSchema,
   nodeRunSummarySchema,
@@ -67,5 +68,20 @@ describe('load testing fixtures', () => {
         averageRttMs: 24,
       }),
     ]);
+  });
+
+  it('parses the live run snapshot fixture', () => {
+    const fixture = readJson<unknown>(fixturePath('live-run-snapshot.json'));
+
+    expect(liveRunSnapshotSchema.parse(fixture)).toMatchObject({
+      run: {
+        id: 'run-control-live-1',
+        status: 'RUNNING',
+      },
+      nodePool: {
+        id: 'pool-hk-anchor',
+        status: 'HEALTHY',
+      },
+    });
   });
 });

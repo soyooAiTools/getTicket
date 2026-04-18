@@ -13,6 +13,7 @@ import {
 
 import { ScenarioEngineService } from '../scenarios/scenario-engine.service';
 import { ValidationPolicyService } from '../validation/validation-policy.service';
+import { ControlRepository } from './control.repository';
 
 export type StoredRun = {
   definition: LoadTestRunDefinition;
@@ -26,6 +27,7 @@ export class ControlService {
   constructor(
     private readonly scenarioEngineService: ScenarioEngineService = new ScenarioEngineService(),
     private readonly validationPolicy: ValidationPolicyService = new ValidationPolicyService(),
+    private readonly controlRepository?: ControlRepository,
   ) {}
 
   readonly nodes = new Map<string, NodeRegistration>();
