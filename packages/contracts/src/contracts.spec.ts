@@ -585,6 +585,19 @@ describe('shared contracts', () => {
     });
   });
 
+  it('rejects a node pool payload with a non-positive maxNodes value', () => {
+    expect(() =>
+      nodePoolSchema.parse({
+        id: 'pool-hk-anchor',
+        name: 'Hong Kong anchor pool',
+        region: 'hk',
+        role: 'ANCHOR',
+        maxNodes: 0,
+        nodeIds: ['node-hk-1'],
+      }),
+    ).toThrow();
+  });
+
   it('validates a control run draft payload', () => {
     expect(
       controlRunDraftSchema.parse({
@@ -710,6 +723,7 @@ describe('shared contracts', () => {
             nodeId: 'node-hk-1',
             region: 'hk',
             role: 'CONTROL',
+            status: 'DEGRADED',
             phaseId: null,
             qps: 218.5,
             errorRate: 0.012,
@@ -721,8 +735,8 @@ describe('shared contracts', () => {
         alerts: [
           {
             id: 'alert-001',
-            severity: 'WARN',
-            message: 'One node is busy',
+            severity: 'CRITICAL',
+            message: 'One node is degraded',
             recordedAt: '2026-04-18T09:40:00.000Z',
           },
         ],

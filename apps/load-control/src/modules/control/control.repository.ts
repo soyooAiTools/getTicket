@@ -8,7 +8,9 @@ import {
   type NodeHealthStatus,
   type NodePool,
   type NodeRole,
+  type NodeRunSummary,
   type NodeTelemetrySample,
+  type PlannedNodeAssignment,
   type RunStatus,
   type ScenarioTemplate,
 } from '@ticketing/contracts';
@@ -21,10 +23,21 @@ type NodeDelegate = PrismaClient['loadControlNode'];
 type NodePoolDelegate = PrismaClient['nodePool'];
 type TemplateDelegate = PrismaClient['scenarioTemplate'];
 type TelemetryDelegate = PrismaClient['loadControlTelemetrySample'];
+type AssignmentDelegate = PrismaClient['loadControlAssignment'];
+type SummaryDelegate = PrismaClient['loadControlSummary'];
 
 type PersistedRunRecord = ControlRunRecord & {
   definition: LoadTestRunDefinition;
+  assignments: PlannedNodeAssignment[];
+  summaries: NodeRunSummary[];
 };
+
+type LoadControlRunWithRelations = Prisma.LoadControlRunGetPayload<{
+  include: {
+    assignments: true;
+    summaries: true;
+  };
+}>;
 
 type LoadControlNodeRecord = {
   id: string;
@@ -54,8 +67,12 @@ export class ControlRepository {
       update: this.toRunUpdateInput(draft),
     });
 
-    const persisted = this.mapPersistedRun(record);
-    await this.redis.setJson(this.runCacheKey(persisted.id), persisted);
+    const persisted = await this.refreshRunCache(record.id);
+
+    if (!persisted) {
+      throw new Error(`Unable to cache run draft ${record.id}.`);
+    }
+
     return this.mapRun(record);
   }
 
@@ -176,9 +193,7 @@ export class ControlRepository {
       return cached;
     }
 
-    const record = await this.runDelegate.findUnique({
-      where: { id: runId },
-    });
+    const record = await this.loadRunRecord(runId);
 
     if (!record) {
       return null;
@@ -198,9 +213,85 @@ export class ControlRepository {
       data: { status },
     });
 
-    const persisted = this.mapPersistedRun(record);
-    await this.redis.setJson(this.runCacheKey(persisted.id), persisted);
+    await this.refreshRunCache(runId);
     return this.mapRun(record);
+  }
+
+  async saveAssignments(
+    runId: string,
+    assignments: PlannedNodeAssignment[],
+  ): Promise<void> {
+    const run = await this.runDelegate.findUnique({
+      where: { id: runId },
+      select: { nodePoolId: true },
+    });
+
+    if (!run) {
+      throw new Error(`Unknown run: ${runId}`);
+    }
+
+    if (assignments.length === 0) {
+      await this.assignmentDelegate.deleteMany({
+        where: { runId },
+      });
+      await this.refreshRunCache(runId);
+      return;
+    }
+
+    const assignedNodeIds = assignments.map((assignment) => assignment.nodeId);
+
+    await this.assignmentDelegate.deleteMany({
+      where: {
+        runId,
+        nodeId: { notIn: assignedNodeIds },
+      },
+    });
+
+    for (const assignment of assignments) {
+      await this.assignmentDelegate.upsert({
+        where: {
+          runId_nodeId: {
+            runId,
+            nodeId: assignment.nodeId,
+          },
+        },
+        create: {
+          runId,
+          nodeId: assignment.nodeId,
+          poolId: run.nodePoolId,
+          phasePlan: assignment,
+        },
+        update: {
+          poolId: run.nodePoolId,
+          phasePlan: assignment,
+          assignedAt: new Date(),
+        },
+      });
+    }
+
+    await this.refreshRunCache(runId);
+  }
+
+  async saveSummary(runId: string, summary: NodeRunSummary): Promise<void> {
+    await this.summaryDelegate.upsert({
+      where: {
+        runId_nodeId: {
+          runId,
+          nodeId: summary.nodeId,
+        },
+      },
+      create: {
+        runId,
+        nodeId: summary.nodeId,
+        payload: summary,
+      },
+      update: {
+        payload: summary,
+        reportedAt: new Date(),
+      },
+    });
+
+    await this.refreshRunCache(runId);
   }
 
   private get runDelegate(): RunDelegate {
@@ -221,6 +312,14 @@ export class ControlRepository {
 
   private get telemetryDelegate(): TelemetryDelegate {
     return this.prisma.loadControlTelemetrySample;
+  }
+
+  private get assignmentDelegate(): AssignmentDelegate {
+    return this.prisma.loadControlAssignment;
+  }
+
+  private get summaryDelegate(): SummaryDelegate {
+    return this.prisma.loadControlSummary;
   }
 
   private toRunCreateInput(draft: ControlRunDraft): Prisma.LoadControlRunUncheckedCreateInput {
@@ -265,6 +364,22 @@ export class ControlRepository {
     return records.map((record) => this.mapTelemetry(record));
   }
 
+  private async loadRunRecord(
+    runId: string,
+  ): Promise<LoadControlRunWithRelations | null> {
+    return this.runDelegate.findUnique({
+      where: { id: runId },
+      include: {
+        assignments: {
+          orderBy: { assignedAt: 'asc' },
+        },
+        summaries: {
+          orderBy: { reportedAt: 'asc' },
+        },
+      },
+    });
+  }
+
   private mapRun(record: {
     id: string;
     templateId: string;
@@ -298,12 +413,20 @@ export class ControlRepository {
     status: RunStatus;
     tags: Prisma.JsonValue;
     definition: Prisma.JsonValue;
+    assignments?: { phasePlan: Prisma.JsonValue }[];
+    summaries?: { payload: Prisma.JsonValue }[];
     createdAt: Date;
     updatedAt: Date;
   }): PersistedRunRecord {
     return {
       ...this.mapRun(record),
       definition: record.definition as LoadTestRunDefinition,
+      assignments: (record.assignments ?? []).map((assignment) =>
+        this.mapAssignment(assignment.phasePlan),
+      ),
+      summaries: (record.summaries ?? []).map((summary) =>
+        this.mapSummary(summary.payload),
+      ),
     };
   }
 
@@ -350,7 +473,7 @@ export class ControlRepository {
       name: record.name,
       region: record.region,
       role: record.role,
-      maxNodes: Math.max(record.nodeCount, nodeIds.length),
+      maxNodes: Math.max(1, record.nodeCount, nodeIds.length),
       nodeIds,
     };
   }
@@ -396,6 +519,14 @@ export class ControlRepository {
     };
   }
 
+  private mapAssignment(value: Prisma.JsonValue): PlannedNodeAssignment {
+    return value as PlannedNodeAssignment;
+  }
+
+  private mapSummary(value: Prisma.JsonValue): NodeRunSummary {
+    return value as NodeRunSummary;
+  }
+
   private toStringRecord(value: Prisma.JsonValue): Record<string, string> {
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
       return {};
@@ -426,5 +557,18 @@ export class ControlRepository {
 
   private telemetryCacheKey(runId: string): string {
     return `load-control:telemetry:${runId}`;
+  }
+
+  private async refreshRunCache(runId: string): Promise<PersistedRunRecord | null> {
+    const record = await this.loadRunRecord(runId);
+
+    if (!record) {
+      await this.redis.delete(this.runCacheKey(runId));
+      return null;
+    }
+
+    const mapped = this.mapPersistedRun(record);
+    await this.redis.setJson(this.runCacheKey(runId), mapped);
+    return mapped;
   }
 }

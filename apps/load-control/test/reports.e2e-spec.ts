@@ -3,62 +3,67 @@ import 'reflect-metadata';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 
+import { ControlService } from '../src/modules/control/control.service';
 import { createLoadControlE2eApp } from './e2e-app';
 
 describe('Reports endpoints', () => {
   let app: INestApplication;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     app = await createLoadControlE2eApp();
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await app.close();
   });
 
   it('rejects calibration reports for runs that are not completed', async () => {
     const draftRun = {
-      mode: 'PREPROD',
-      targetBaseUrl: 'https://preprod.example.com',
-      inventoryPoolId: 'inventory-main',
-      maxGlobalQps: 200,
-      maxNodeConcurrency: 16,
-      tags: {
-        test_run_id: 'report-check',
+      templateId: 'template-report-check',
+      nodePoolId: 'pool-report-check',
+      definition: {
+        mode: 'PREPROD',
+        targetBaseUrl: 'https://preprod.example.com',
+        inventoryPoolId: 'inventory-main',
+        maxGlobalQps: 200,
+        maxNodeConcurrency: 16,
+        tags: {
+          test_run_id: 'report-check',
+        },
+        requestTemplates: {
+          query: {
+            method: 'GET',
+            path: '/catalog',
+            timeoutMs: 500,
+          },
+          queue: {
+            method: 'POST',
+            path: '/queue',
+            timeoutMs: 500,
+          },
+          inventoryLock: {
+            method: 'POST',
+            path: '/inventory/lock',
+            timeoutMs: 500,
+          },
+          orderSubmit: {
+            method: 'POST',
+            path: '/orders',
+            timeoutMs: 500,
+          },
+        },
+        phases: [
+          {
+            id: 'warmup',
+            startsAtOffsetMs: 0,
+            durationMs: 30000,
+            queryConcurrency: 4,
+            queuePollingConcurrency: 2,
+            inventoryLockConcurrency: 0,
+            orderSubmissionConcurrency: 0,
+          },
+        ],
       },
-      requestTemplates: {
-        query: {
-          method: 'GET',
-          path: '/catalog',
-          timeoutMs: 500,
-        },
-        queue: {
-          method: 'POST',
-          path: '/queue',
-          timeoutMs: 500,
-        },
-        inventoryLock: {
-          method: 'POST',
-          path: '/inventory/lock',
-          timeoutMs: 500,
-        },
-        orderSubmit: {
-          method: 'POST',
-          path: '/orders',
-          timeoutMs: 500,
-        },
-      },
-      phases: [
-        {
-          id: 'warmup',
-          startsAtOffsetMs: 0,
-          durationMs: 30000,
-          queryConcurrency: 4,
-          queuePollingConcurrency: 2,
-          inventoryLockConcurrency: 0,
-          orderSubmissionConcurrency: 0,
-        },
-      ],
     };
 
     await request(app.getHttpServer())
@@ -66,6 +71,10 @@ describe('Reports endpoints', () => {
       .send({
         id: 'run-report-baseline',
         ...draftRun,
+        definition: {
+          id: 'run-report-baseline',
+          ...draftRun.definition,
+        },
       })
       .expect(201);
 
@@ -74,6 +83,10 @@ describe('Reports endpoints', () => {
       .send({
         id: 'run-report-production',
         ...draftRun,
+        definition: {
+          id: 'run-report-production',
+          ...draftRun.definition,
+        },
       })
       .expect(201);
 
@@ -104,47 +117,51 @@ describe('Reports endpoints', () => {
       maxConcurrency: 12,
     };
     const draftRun = {
-      mode: 'PREPROD',
-      targetBaseUrl: 'https://preprod.example.com',
-      inventoryPoolId: 'inventory-main',
-      maxGlobalQps: 200,
-      maxNodeConcurrency: 16,
-      tags: {
-        test_run_id: 'report-success',
+      templateId: 'template-report-success',
+      nodePoolId: 'pool-report-success',
+      definition: {
+        mode: 'PREPROD',
+        targetBaseUrl: 'https://preprod.example.com',
+        inventoryPoolId: 'inventory-main',
+        maxGlobalQps: 200,
+        maxNodeConcurrency: 16,
+        tags: {
+          test_run_id: 'report-success',
+        },
+        requestTemplates: {
+          query: {
+            method: 'GET',
+            path: '/catalog',
+            timeoutMs: 500,
+          },
+          queue: {
+            method: 'POST',
+            path: '/queue',
+            timeoutMs: 500,
+          },
+          inventoryLock: {
+            method: 'POST',
+            path: '/inventory/lock',
+            timeoutMs: 500,
+          },
+          orderSubmit: {
+            method: 'POST',
+            path: '/orders',
+            timeoutMs: 500,
+          },
+        },
+        phases: [
+          {
+            id: 'warmup',
+            startsAtOffsetMs: 0,
+            durationMs: 30000,
+            queryConcurrency: 4,
+            queuePollingConcurrency: 2,
+            inventoryLockConcurrency: 0,
+            orderSubmissionConcurrency: 0,
+          },
+        ],
       },
-      requestTemplates: {
-        query: {
-          method: 'GET',
-          path: '/catalog',
-          timeoutMs: 500,
-        },
-        queue: {
-          method: 'POST',
-          path: '/queue',
-          timeoutMs: 500,
-        },
-        inventoryLock: {
-          method: 'POST',
-          path: '/inventory/lock',
-          timeoutMs: 500,
-        },
-        orderSubmit: {
-          method: 'POST',
-          path: '/orders',
-          timeoutMs: 500,
-        },
-      },
-      phases: [
-        {
-          id: 'warmup',
-          startsAtOffsetMs: 0,
-          durationMs: 30000,
-          queryConcurrency: 4,
-          queuePollingConcurrency: 2,
-          inventoryLockConcurrency: 0,
-          orderSubmissionConcurrency: 0,
-        },
-      ],
     };
 
     await request(app.getHttpServer())
@@ -157,6 +174,10 @@ describe('Reports endpoints', () => {
       .send({
         id: 'run-report-baseline-ok',
         ...draftRun,
+        definition: {
+          id: 'run-report-baseline-ok',
+          ...draftRun.definition,
+        },
       })
       .expect(201);
 
@@ -165,6 +186,10 @@ describe('Reports endpoints', () => {
       .send({
         id: 'run-report-production-ok',
         ...draftRun,
+        definition: {
+          id: 'run-report-production-ok',
+          ...draftRun.definition,
+        },
       })
       .expect(201);
 
@@ -217,6 +242,8 @@ describe('Reports endpoints', () => {
         ],
       })
       .expect(201);
+
+    app.get(ControlService).runs.clear();
 
     await request(app.getHttpServer())
       .get(

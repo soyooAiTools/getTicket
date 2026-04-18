@@ -30,6 +30,7 @@ describe('repo layout', () => {
     expect(rootPackage.packageManager).toMatch(/^pnpm@\d+\.\d+\.\d+$/);
     expect(rootPackage.scripts).toEqual(
       expect.objectContaining({
+        postinstall: expect.stringContaining('pnpm --filter load-control prisma:generate'),
         'dev:api': expect.stringContaining('pnpm --filter api dev'),
         'dev:load-control': expect.stringContaining('pnpm --filter load-control dev'),
         'dev:admin': expect.stringContaining('pnpm --filter admin dev'),
@@ -37,8 +38,13 @@ describe('repo layout', () => {
         lint: expect.stringContaining('eslint tests'),
       }),
     );
+    expect(rootPackage.scripts?.postinstall).toContain('pnpm --filter api prisma:generate');
     expect(rootPackage.scripts?.test).toContain('pnpm --filter load-control test');
     expect(rootPackage.scripts?.test).toContain('pnpm --filter load-control test:e2e');
+    expect(rootPackage.scripts?.test).toContain('pnpm --filter api prisma:generate');
+    expect(rootPackage.scripts?.test).toContain(
+      'pnpm --filter load-control prisma:generate',
+    );
     expect(rootPackage.scripts?.test).toContain(
       'pnpm exec vitest run tests/perf/load-testing-fixtures.spec.ts',
     );

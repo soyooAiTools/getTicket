@@ -27,6 +27,8 @@ export type StoredRun = {
 
 type PersistedStoredRun = ControlRunRecord & {
   definition: LoadTestRunDefinition;
+  assignments: PlannedNodeAssignment[];
+  summaries: NodeRunSummary[];
 };
 
 @Injectable()
@@ -41,6 +43,8 @@ export class ControlService {
 
   readonly runs = new Map<string, StoredRun>();
 
+  private readonly runRecords = new Map<string, ControlRunRecord>();
+
   registerNode(node: NodeRegistration): NodeRegistration {
     this.nodes.set(node.id, node);
     return node;
@@ -52,7 +56,13 @@ export class ControlService {
     );
   }
 
-  async createRun(definition: LoadTestRunDefinition): Promise<StoredRun> {
+  async createRun(
+    input: ControlRunDraft | LoadTestRunDefinition,
+  ): Promise<StoredRun> {
+    const isDraft = this.isControlRunDraft(input);
+    const draft = isDraft ? input : null;
+    const definition: LoadTestRunDefinition = isDraft ? input.definition : input;
+    const runId = input.id;
     const run: StoredRun = {
       definition,
       status: 'DRAFT',
@@ -60,8 +70,13 @@ export class ControlService {
       summaries: [],
     };
 
-    this.runs.set(definition.id, run);
-    await this.persistRunDraft(definition);
+    this.runs.set(runId, run);
+
+    if (draft) {
+      this.runRecords.set(runId, this.toRunRecord(draft));
+      await this.persistRunDraft(draft);
+    }
+
     return run;
   }
 
@@ -70,7 +85,13 @@ export class ControlService {
       return this.controlRepository.listRuns();
     }
 
-    return [...this.runs.values()].map((run) => this.toControlRunRecord(run));
+    if (this.runRecords.size > 0) {
+      return [...this.runRecords.values()].sort((left, right) =>
+        right.createdAt.localeCompare(left.createdAt),
+      );
+    }
+
+    return [...this.runs.values()].map((run) => this.toLegacyRunRecord(run));
   }
 
   async planRun(runId: string): Promise<StoredRun> {
@@ -89,14 +110,24 @@ export class ControlService {
       const persisted = await this.controlRepository.getRun(runId);
 
       if (!persisted) {
+        const inMemoryRun = this.runs.get(runId);
+
+        if (inMemoryRun) {
+          return inMemoryRun;
+        }
+
         throw new NotFoundException(`Unknown run: ${runId}`);
       }
+
+      this.runRecords.set(runId, this.toPersistedRunRecord(persisted));
 
       const storedRun = this.runs.get(runId);
 
       if (storedRun) {
         storedRun.definition = persisted.definition;
         storedRun.status = persisted.status;
+        storedRun.assignments = persisted.assignments ?? [];
+        storedRun.summaries = persisted.summaries ?? [];
         return storedRun;
       }
 
@@ -121,6 +152,11 @@ export class ControlService {
     const run = await this.getRun(runId);
     run.assignments = assignments;
     run.status = 'PLANNED';
+
+    if (this.controlRepository) {
+      await this.controlRepository.saveAssignments(runId, assignments);
+    }
+
     await this.updateRunStatus(runId, 'PLANNED');
     return run;
   }
@@ -136,6 +172,11 @@ export class ControlService {
     nextSummaries.push(summary);
     run.summaries = nextSummaries;
     run.status = this.hasCollectedAllSummaries(run) ? 'COMPLETED' : 'PLANNED';
+
+    if (this.controlRepository) {
+      await this.controlRepository.saveSummary(runId, summary);
+    }
+
     await this.updateRunStatus(runId, run.status);
     return run;
   }
@@ -147,26 +188,28 @@ export class ControlService {
       run.status = status;
     }
 
+    const record = this.runRecords.get(runId);
+
+    if (record) {
+      this.runRecords.set(runId, {
+        ...record,
+        status,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
     if (!this.controlRepository) {
       return;
     }
 
-    await this.controlRepository.updateRunStatus(runId, status);
+    const persistedRecord = await this.controlRepository.updateRunStatus(runId, status);
+    this.runRecords.set(runId, persistedRecord);
   }
 
-  private async persistRunDraft(
-    definition: LoadTestRunDefinition,
-  ): Promise<void> {
+  private async persistRunDraft(draft: ControlRunDraft): Promise<void> {
     if (!this.controlRepository) {
       return;
     }
-
-    const draft: ControlRunDraft = {
-      id: definition.id,
-      templateId: definition.id,
-      nodePoolId: definition.inventoryPoolId ?? definition.id,
-      definition,
-    };
 
     await this.controlRepository.createRunDraft(draft);
   }
@@ -175,12 +218,42 @@ export class ControlService {
     return {
       definition: run.definition,
       status: run.status,
-      assignments: [],
-      summaries: [],
+      assignments: run.assignments ?? [],
+      summaries: run.summaries ?? [],
     };
   }
 
-  private toControlRunRecord(run: StoredRun): ControlRunRecord {
+  private toRunRecord(draft: ControlRunDraft): ControlRunRecord {
+    const now = new Date().toISOString();
+
+    return {
+      id: draft.id,
+      templateId: draft.templateId,
+      nodePoolId: draft.nodePoolId,
+      mode: draft.definition.mode,
+      targetBaseUrl: draft.definition.targetBaseUrl,
+      status: 'DRAFT',
+      tags: draft.definition.tags,
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+
+  private toPersistedRunRecord(run: PersistedStoredRun): ControlRunRecord {
+    return {
+      id: run.id,
+      templateId: run.templateId,
+      nodePoolId: run.nodePoolId,
+      mode: run.mode,
+      targetBaseUrl: run.targetBaseUrl,
+      status: run.status,
+      tags: run.tags,
+      createdAt: run.createdAt,
+      updatedAt: run.updatedAt,
+    };
+  }
+
+  private toLegacyRunRecord(run: StoredRun): ControlRunRecord {
     const now = new Date().toISOString();
 
     return {
@@ -194,6 +267,12 @@ export class ControlService {
       createdAt: now,
       updatedAt: now,
     };
+  }
+
+  private isControlRunDraft(
+    input: ControlRunDraft | LoadTestRunDefinition,
+  ): input is ControlRunDraft {
+    return 'definition' in input;
   }
 
   private assertSummaryMatchesAssignment(

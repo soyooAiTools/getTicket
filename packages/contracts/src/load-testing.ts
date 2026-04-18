@@ -143,7 +143,7 @@ export const nodePoolSchema = z
     name: z.string().min(1),
     region: z.string().min(1),
     role: nodeRoleSchema,
-    maxNodes: z.number().int().nonnegative(),
+    maxNodes: z.number().int().positive(),
     nodeIds: z.array(z.string().min(1)),
   })
   .strict();
@@ -190,6 +190,7 @@ const liveRunNodeSchema = z
     nodeId: z.string().min(1),
     region: z.string().min(1),
     role: nodeRoleSchema,
+    status: nodeHealthStatusSchema,
     phaseId: z.string().min(1).nullable(),
     qps: z.number().nonnegative(),
     errorRate: z.number().min(0).max(1),
@@ -202,7 +203,7 @@ const liveRunNodeSchema = z
 const liveRunAlertSchema = z
   .object({
     id: z.string().min(1),
-    severity: z.enum(['INFO', 'WARN', 'ERROR']),
+    severity: z.enum(['INFO', 'WARN', 'CRITICAL']),
     message: z.string().min(1),
     recordedAt: z.string().datetime(),
   })

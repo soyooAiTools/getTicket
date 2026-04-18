@@ -78,13 +78,19 @@ describe('load testing fixtures', () => {
       status: 'RUNNING',
       currentPhaseId: null,
       activeNodeCount: 1,
-      unhealthyNodeCount: 0,
+      unhealthyNodeCount: 1,
       nodes: [
         expect.objectContaining({
           nodeId: 'node-hk-1',
           region: 'hk',
           role: 'CONTROL',
+          status: 'DEGRADED',
           phaseId: null,
+        }),
+      ],
+      alerts: [
+        expect.objectContaining({
+          severity: 'CRITICAL',
         }),
       ],
     });

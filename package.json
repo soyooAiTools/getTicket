@@ -3,11 +3,12 @@
   "private": true,
   "packageManager": "pnpm@10.8.1",
   "scripts": {
+    "postinstall": "corepack pnpm --filter api prisma:generate && corepack pnpm --filter load-control prisma:generate",
     "dev:api": "corepack pnpm --filter api dev",
     "dev:load-control": "corepack pnpm --filter load-control dev",
     "dev:admin": "corepack pnpm --filter admin dev",
     "dev:miniapp": "corepack pnpm --filter miniapp dev:weapp",
-    "test": "corepack pnpm --filter api test && corepack pnpm --filter @ticketing/contracts test && corepack pnpm --filter load-control test && corepack pnpm --filter load-control test:e2e && corepack pnpm exec vitest run tests/perf/load-testing-fixtures.spec.ts && corepack pnpm exec vitest run tests/workspace/repo-layout.spec.ts",
+    "test": "corepack pnpm --filter api prisma:generate && corepack pnpm --filter load-control prisma:generate && corepack pnpm --filter api test && corepack pnpm --filter @ticketing/contracts test && corepack pnpm --filter load-control test && corepack pnpm --filter load-control test:e2e && corepack pnpm exec vitest run tests/perf/load-testing-fixtures.spec.ts && corepack pnpm exec vitest run tests/workspace/repo-layout.spec.ts",
     "lint": "corepack pnpm -r --if-present lint && corepack pnpm exec eslint tests --ext .ts"
   },
   "devDependencies": {

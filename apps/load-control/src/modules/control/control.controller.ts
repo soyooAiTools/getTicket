@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 
 import {
-  loadTestRunDefinitionSchema,
+  controlRunDraftSchema,
   nodeRegistrationSchema,
   nodeRunSummarySchema,
 } from '@ticketing/contracts';
@@ -24,7 +24,7 @@ export class ControlController {
 
   @Post('runs')
   createRun(@Body() body: unknown) {
-    return this.controlService.createRun(loadTestRunDefinitionSchema.parse(body));
+    return this.controlService.createRun(controlRunDraftSchema.parse(body));
   }
 
   @Get('runs/:runId')

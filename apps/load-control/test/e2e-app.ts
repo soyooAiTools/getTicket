@@ -8,7 +8,9 @@ import type {
   NodeHealthStatus,
   NodePool,
   NodeRole,
+  NodeRunSummary,
   NodeTelemetrySample,
+  PlannedNodeAssignment,
   RunStatus,
   ScenarioTemplate,
 } from '@ticketing/contracts';
@@ -20,7 +22,12 @@ import { RedisService } from '../src/common/redis/redis.service';
 
 type PersistedRunRecord = ControlRunRecord & {
   definition: LoadTestRunDefinition;
+  assignments: PlannedNodeAssignment[];
+  summaries: NodeRunSummary[];
 };
+
+type UpsertNodeInput = Parameters<ControlRepository['upsertNode']>[0];
+type UpsertNodeResult = Awaited<ReturnType<ControlRepository['upsertNode']>>;
 
 export async function createLoadControlE2eApp(): Promise<INestApplication> {
   const runs = new Map<string, PersistedRunRecord>();
@@ -39,6 +46,8 @@ export async function createLoadControlE2eApp(): Promise<INestApplication> {
         createdAt: now,
         updatedAt: now,
         definition: draft.definition,
+        assignments: [],
+        summaries: [],
       };
 
       runs.set(record.id, record);
@@ -46,7 +55,14 @@ export async function createLoadControlE2eApp(): Promise<INestApplication> {
     },
 
     async listRuns() {
-      return [...runs.values()].map(({ definition: _definition, ...record }) => record);
+      return [...runs.values()].map(
+        ({
+          definition: _definition,
+          assignments: _assignments,
+          summaries: _summaries,
+          ...record
+        }) => record,
+      );
     },
 
     async getRun(runId: string) {
@@ -70,17 +86,41 @@ export async function createLoadControlE2eApp(): Promise<INestApplication> {
       return next;
     },
 
-    async upsertNode(input: {
-      id: string;
-      poolId: string;
-      region: string;
-      role: NodeRole;
-      healthStatus: NodeHealthStatus;
-      maxConcurrency: number;
-      networkProfile: unknown;
-      labels?: Record<string, string>;
-      lastSeenAt?: string | Date | null;
-    }) {
+    async saveAssignments(runId: string, assignments: PlannedNodeAssignment[]) {
+      const existing = runs.get(runId);
+
+      if (!existing) {
+        throw new Error(`Unknown run: ${runId}`);
+      }
+
+      runs.set(runId, {
+        ...existing,
+        assignments,
+        updatedAt: new Date().toISOString(),
+      });
+    },
+
+    async saveSummary(runId: string, summary: NodeRunSummary) {
+      const existing = runs.get(runId);
+
+      if (!existing) {
+        throw new Error(`Unknown run: ${runId}`);
+      }
+
+      const summaries = existing.summaries.filter(
+        (entry) => entry.nodeId !== summary.nodeId,
+      );
+
+      summaries.push(summary);
+
+      runs.set(runId, {
+        ...existing,
+        summaries,
+        updatedAt: new Date().toISOString(),
+      });
+    },
+
+    async upsertNode(input: UpsertNodeInput): Promise<UpsertNodeResult> {
       return {
         id: input.id,
         poolId: input.poolId,
@@ -88,7 +128,7 @@ export async function createLoadControlE2eApp(): Promise<INestApplication> {
         role: input.role,
         healthStatus: input.healthStatus,
         maxConcurrency: input.maxConcurrency,
-        networkProfile: input.networkProfile,
+        networkProfile: input.networkProfile as UpsertNodeResult['networkProfile'],
         labels: input.labels ?? {},
         lastSeenAt:
           typeof input.lastSeenAt === 'string'

@@ -6,12 +6,13 @@
   "aggregateErrorRate": 0.012,
   "aggregateP95LatencyMs": 240,
   "activeNodeCount": 1,
-  "unhealthyNodeCount": 0,
+  "unhealthyNodeCount": 1,
   "nodes": [
     {
       "nodeId": "node-hk-1",
       "region": "hk",
       "role": "CONTROL",
+      "status": "DEGRADED",
       "phaseId": null,
       "qps": 218.5,
       "errorRate": 0.012,
@@ -23,8 +24,8 @@
   "alerts": [
     {
       "id": "alert-001",
-      "severity": "WARN",
-      "message": "One node is busy",
+      "severity": "CRITICAL",
+      "message": "One node is degraded",
       "recordedAt": "2026-04-18T09:40:00.000Z"
     }
   ],
