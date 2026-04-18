@@ -31,6 +31,7 @@ type UpsertNodeResult = Awaited<ReturnType<ControlRepository['upsertNode']>>;
 
 export async function createLoadControlE2eApp(): Promise<INestApplication> {
   const runs = new Map<string, PersistedRunRecord>();
+  const telemetryByRun = new Map<string, NodeTelemetrySample[]>();
 
   const controlRepository: Partial<ControlRepository> = {
     async createRunDraft(draft: ControlRunDraft) {
@@ -148,11 +149,17 @@ export async function createLoadControlE2eApp(): Promise<INestApplication> {
     },
 
     async saveTelemetrySample(sample: NodeTelemetrySample) {
+      const existing = telemetryByRun.get(sample.runId) ?? [];
+      const next = [sample, ...existing].sort((left, right) =>
+        right.recordedAt.localeCompare(left.recordedAt),
+      );
+
+      telemetryByRun.set(sample.runId, next);
       return sample;
     },
 
-    async listRecentTelemetry() {
-      return [];
+    async listRecentTelemetry(runId: string, limit = 50) {
+      return (telemetryByRun.get(runId) ?? []).slice(0, limit);
     },
   };
 

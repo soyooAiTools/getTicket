@@ -6,6 +6,7 @@ import { ControlModule } from './modules/control/control.module';
 import { HealthModule } from './modules/health/health.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { ScenariosModule } from './modules/scenarios/scenarios.module';
+import { TelemetryModule } from './modules/telemetry/telemetry.module';
 import { ValidationModule } from './modules/validation/validation.module';
 
 @Module({
@@ -16,6 +17,7 @@ import { ValidationModule } from './modules/validation/validation.module';
     ScenariosModule,
     ValidationModule,
     ControlModule,
+    TelemetryModule,
     ReportsModule,
   ],
 })

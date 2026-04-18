@@ -161,7 +161,7 @@ export class AgentRunner {
         return;
       }
 
-      await hooks.onTelemetry(
+      await hooks.onTelemetry?.(
         this.buildTelemetrySample({
           assignment,
           phase,

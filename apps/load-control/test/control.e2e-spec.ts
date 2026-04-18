@@ -40,6 +40,36 @@ describe('Control endpoints', () => {
       .expect(payload);
   });
 
+  it('lists seeded node pools and templates', async () => {
+    await request(app.getHttpServer())
+      .get('/control/node-pools')
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              id: 'pool-control-01',
+              role: 'CONTROL',
+            }),
+          ]),
+        );
+      });
+
+    await request(app.getHttpServer())
+      .get('/control/templates')
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              id: 'template-preprod-01',
+              name: expect.any(String),
+            }),
+          ]),
+        );
+      });
+  });
+
   it('creates a draft run at POST /control/runs', async () => {
     const payload = {
       id: 'run-01',
@@ -357,6 +387,127 @@ describe('Control endpoints', () => {
             nodeId: 'node-cold-01',
           }),
         ]);
+      });
+  });
+
+  it('lists runs and persists start and stop transitions', async () => {
+    const node = {
+      id: 'node-start-stop-01',
+      region: 'ap-southeast-1',
+      role: 'CONTROL',
+      networkProfile: {
+        id: 'net-start-stop-1',
+        label: 'steady',
+        baseLatencyMs: 25,
+        jitterMs: 5,
+        packetLossRatio: 0.01,
+      },
+      maxConcurrency: 12,
+    };
+    const run = {
+      id: 'run-start-stop-01',
+      templateId: 'template-preprod-01',
+      nodePoolId: 'pool-control-01',
+      definition: {
+        id: 'run-start-stop-01',
+        mode: 'PREPROD',
+        targetBaseUrl: 'https://preprod.example.com',
+        inventoryPoolId: 'inventory-main',
+        maxGlobalQps: 200,
+        maxNodeConcurrency: 16,
+        tags: {
+          team: 'growth',
+        },
+        requestTemplates: {
+          query: {
+            method: 'GET',
+            path: '/catalog',
+            timeoutMs: 500,
+          },
+          queue: {
+            method: 'POST',
+            path: '/queue',
+            timeoutMs: 500,
+          },
+          inventoryLock: {
+            method: 'POST',
+            path: '/inventory/lock',
+            timeoutMs: 500,
+          },
+          orderSubmit: {
+            method: 'POST',
+            path: '/orders',
+            timeoutMs: 500,
+          },
+        },
+        phases: [
+          {
+            id: 'warmup',
+            startsAtOffsetMs: 0,
+            durationMs: 30000,
+            queryConcurrency: 4,
+            queuePollingConcurrency: 2,
+            inventoryLockConcurrency: 0,
+            orderSubmissionConcurrency: 0,
+          },
+        ],
+      },
+    };
+
+    await request(app.getHttpServer())
+      .post('/control/nodes/register')
+      .send(node)
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post('/control/runs')
+      .send(run)
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .get('/control/runs')
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              id: 'run-start-stop-01',
+              status: 'DRAFT',
+            }),
+          ]),
+        );
+      });
+
+    await request(app.getHttpServer())
+      .post('/control/runs/run-start-stop-01/plan')
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post('/control/runs/run-start-stop-01/start')
+      .expect(201)
+      .expect(({ body }) => {
+        expect(body.status).toBe('RUNNING');
+      });
+
+    await request(app.getHttpServer())
+      .post('/control/runs/run-start-stop-01/stop')
+      .expect(201)
+      .expect(({ body }) => {
+        expect(body.status).toBe('STOPPING');
+      });
+
+    await request(app.getHttpServer())
+      .get('/control/runs')
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              id: 'run-start-stop-01',
+              status: 'STOPPING',
+            }),
+          ]),
+        );
       });
   });
 });

@@ -10,6 +10,6 @@ import { ValidationModule } from '../validation/validation.module';
   imports: [ScenariosModule, ValidationModule],
   controllers: [ControlController],
   providers: [ControlRepository, ControlService],
-  exports: [ControlService],
+  exports: [ControlRepository, ControlService],
 })
 export class ControlModule {}

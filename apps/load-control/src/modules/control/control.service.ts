@@ -9,14 +9,20 @@ import {
   type ControlRunRecord,
   type LoadTestRunDefinition,
   type NodeRegistration,
+  type NodePool,
   type NodeRunSummary,
   type PlannedNodeAssignment,
   type RunStatus,
+  type ScenarioTemplate,
 } from '@ticketing/contracts';
 
 import { ScenarioEngineService } from '../scenarios/scenario-engine.service';
 import { ValidationPolicyService } from '../validation/validation-policy.service';
 import { ControlRepository } from './control.repository';
+import {
+  DEFAULT_NODE_POOLS,
+  DEFAULT_SCENARIO_TEMPLATES,
+} from './default-control-catalog';
 
 export type StoredRun = {
   definition: LoadTestRunDefinition;
@@ -44,6 +50,10 @@ export class ControlService {
   readonly runs = new Map<string, StoredRun>();
 
   private readonly runRecords = new Map<string, ControlRunRecord>();
+
+  private readonly seededNodePools = this.cloneCatalog(DEFAULT_NODE_POOLS);
+
+  private readonly seededTemplates = this.cloneCatalog(DEFAULT_SCENARIO_TEMPLATES);
 
   registerNode(node: NodeRegistration): NodeRegistration {
     this.nodes.set(node.id, node);
@@ -97,6 +107,22 @@ export class ControlService {
     }
 
     return [...this.runs.values()].map((run) => this.toLegacyRunRecord(run));
+  }
+
+  async listNodePools(): Promise<NodePool[]> {
+    const persistedPools = this.controlRepository
+      ? await this.controlRepository.listNodePools()
+      : [];
+
+    return this.mergeCatalog(this.seededNodePools, persistedPools);
+  }
+
+  async listTemplates(): Promise<ScenarioTemplate[]> {
+    const persistedTemplates = this.controlRepository
+      ? await this.controlRepository.listTemplates()
+      : [];
+
+    return this.mergeCatalog(this.seededTemplates, persistedTemplates);
   }
 
   async planRun(runId: string): Promise<StoredRun> {
@@ -209,6 +235,52 @@ export class ControlService {
 
     const persistedRecord = await this.controlRepository.updateRunStatus(runId, status);
     this.runRecords.set(runId, persistedRecord);
+  }
+
+  async startRun(runId: string): Promise<StoredRun> {
+    const run = await this.getRun(runId);
+
+    if (run.status === 'RUNNING') {
+      return run;
+    }
+
+    if (run.status === 'COMPLETED' || run.status === 'FAILED') {
+      throw new BadRequestException(
+        `Run ${runId} cannot be started from status ${run.status}.`,
+      );
+    }
+
+    if (run.assignments.length === 0) {
+      throw new BadRequestException(
+        `Run ${runId} must be planned before it can be started.`,
+      );
+    }
+
+    await this.updateRunStatus(runId, 'RUNNING');
+    run.status = 'RUNNING';
+    return run;
+  }
+
+  async stopRun(runId: string): Promise<StoredRun> {
+    const run = await this.getRun(runId);
+
+    if (run.status === 'STOPPING' || run.status === 'STOPPED') {
+      return run;
+    }
+
+    if (run.status === 'DRAFT') {
+      throw new BadRequestException(
+        `Run ${runId} must be started before it can be stopped.`,
+      );
+    }
+
+    if (run.status === 'COMPLETED' || run.status === 'FAILED') {
+      return run;
+    }
+
+    await this.updateRunStatus(runId, 'STOPPING');
+    run.status = 'STOPPING';
+    return run;
   }
 
   private async persistRunDraft(draft: ControlRunDraft): Promise<void> {
@@ -373,6 +445,29 @@ export class ControlService {
 
     return [...expectedNodeIds].every((nodeId) =>
       run.summaries.some((summary) => summary.nodeId === nodeId),
+    );
+  }
+
+  private cloneCatalog<T>(entries: readonly T[]): T[] {
+    return [...structuredClone(entries)];
+  }
+
+  private mergeCatalog<T extends { id: string; name: string }>(
+    seeded: readonly T[],
+    persisted: readonly T[],
+  ): T[] {
+    const catalog = new Map<string, T>();
+
+    for (const entry of seeded) {
+      catalog.set(entry.id, structuredClone(entry));
+    }
+
+    for (const entry of persisted) {
+      catalog.set(entry.id, structuredClone(entry));
+    }
+
+    return [...catalog.values()].sort((left, right) =>
+      left.name.localeCompare(right.name),
     );
   }
 }

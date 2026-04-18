@@ -202,6 +202,14 @@ describe('Reports endpoints', () => {
       .expect(201);
 
     await request(app.getHttpServer())
+      .post('/control/runs/run-report-baseline-ok/start')
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post('/control/runs/run-report-production-ok/start')
+      .expect(201);
+
+    await request(app.getHttpServer())
       .post('/control/runs/run-report-baseline-ok/results')
       .send({
         runId: 'run-report-baseline-ok',

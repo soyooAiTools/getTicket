@@ -22,9 +22,24 @@ export class ControlController {
     return this.controlService.listNodes();
   }
 
+  @Get('node-pools')
+  listNodePools() {
+    return this.controlService.listNodePools();
+  }
+
+  @Get('templates')
+  listTemplates() {
+    return this.controlService.listTemplates();
+  }
+
   @Post('runs')
   createRun(@Body() body: unknown) {
     return this.controlService.createRun(controlRunDraftSchema.parse(body));
+  }
+
+  @Get('runs')
+  listRuns() {
+    return this.controlService.listRuns();
   }
 
   @Get('runs/:runId')
@@ -35,6 +50,16 @@ export class ControlController {
   @Post('runs/:runId/plan')
   planRun(@Param('runId') runId: string) {
     return this.controlService.planRun(runId);
+  }
+
+  @Post('runs/:runId/start')
+  startRun(@Param('runId') runId: string) {
+    return this.controlService.startRun(runId);
+  }
+
+  @Post('runs/:runId/stop')
+  stopRun(@Param('runId') runId: string) {
+    return this.controlService.stopRun(runId);
   }
 
   @Post('runs/:runId/results')
