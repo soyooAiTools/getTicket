@@ -1,22 +1,15 @@
 import 'reflect-metadata';
 
 import { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
 import request from 'supertest';
 
-import { AppModule } from '../src/app.module';
+import { createLoadControlE2eApp } from './e2e-app';
 
 describe('Control endpoints', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleRef.createNestApplication();
-    app.setGlobalPrefix('control');
-    await app.init();
+    app = await createLoadControlE2eApp();
   });
 
   afterAll(async () => {

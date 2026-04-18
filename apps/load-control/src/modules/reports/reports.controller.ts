@@ -11,12 +11,14 @@ export class ReportsController {
   ) {}
 
   @Get('calibration/:baselineRunId/:productionRunId')
-  getCalibrationReport(
+  async getCalibrationReport(
     @Param('baselineRunId') baselineRunId: string,
     @Param('productionRunId') productionRunId: string,
   ) {
-    const baselineRun = this.controlService.getRun(baselineRunId);
-    const productionRun = this.controlService.getRun(productionRunId);
+    const [baselineRun, productionRun] = await Promise.all([
+      this.controlService.getRun(baselineRunId),
+      this.controlService.getRun(productionRunId),
+    ]);
 
     if (
       baselineRun.status !== 'COMPLETED' ||

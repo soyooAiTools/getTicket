@@ -91,6 +91,7 @@ model LoadControlRun {
   nodePoolId     String
   mode           ValidationMode
   targetBaseUrl  String
+  definition     Json
   status         RunStatus        @default(DRAFT)
   tags           Json
   createdAt      DateTime         @default(now())

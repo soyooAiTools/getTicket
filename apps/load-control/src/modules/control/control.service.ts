@@ -25,6 +25,10 @@ export type StoredRun = {
   summaries: NodeRunSummary[];
 };
 
+type PersistedStoredRun = ControlRunRecord & {
+  definition: LoadTestRunDefinition;
+};
+
 @Injectable()
 export class ControlService {
   constructor(
@@ -91,9 +95,14 @@ export class ControlService {
       const storedRun = this.runs.get(runId);
 
       if (storedRun) {
+        storedRun.definition = persisted.definition;
         storedRun.status = persisted.status;
         return storedRun;
       }
+
+      const reconstructed = this.toStoredRun(persisted);
+      this.runs.set(runId, reconstructed);
+      return reconstructed;
     }
 
     const run = this.runs.get(runId);
@@ -160,6 +169,15 @@ export class ControlService {
     };
 
     await this.controlRepository.createRunDraft(draft);
+  }
+
+  private toStoredRun(run: PersistedStoredRun): StoredRun {
+    return {
+      definition: run.definition,
+      status: run.status,
+      assignments: [],
+      summaries: [],
+    };
   }
 
   private toControlRunRecord(run: StoredRun): ControlRunRecord {

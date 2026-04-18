@@ -135,6 +135,42 @@ describe('ControlService', () => {
     );
   });
 
+  it('reconstructs a persisted run when the in-memory map is empty', async () => {
+    const persistedDefinition = {
+      ...runDefinition,
+      id: 'run-persisted',
+    };
+    const controlRepository = {
+      getRun: jest.fn().mockResolvedValue({
+        id: 'run-persisted',
+        templateId: 'template-preprod-01',
+        nodePoolId: 'pool-hk-anchor',
+        mode: 'PREPROD',
+        targetBaseUrl: 'https://preprod.example.com',
+        status: 'DRAFT',
+        tags: {
+          team: 'growth',
+        },
+        createdAt: '2026-04-17T00:00:00.000Z',
+        updatedAt: '2026-04-17T00:00:00.000Z',
+        definition: persistedDefinition,
+      }),
+    };
+    const service = new ControlService(
+      undefined,
+      undefined,
+      controlRepository as never,
+    );
+
+    await expect(service.getRun('run-persisted')).resolves.toEqual({
+      definition: persistedDefinition,
+      status: 'DRAFT',
+      assignments: [],
+      summaries: [],
+    });
+    expect(controlRepository.getRun).toHaveBeenCalledWith('run-persisted');
+  });
+
   it('keeps a planned run open until every assigned node has reported', async () => {
     const service = new ControlService();
     const secondNode = {

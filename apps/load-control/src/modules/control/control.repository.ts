@@ -22,6 +22,10 @@ type NodePoolDelegate = PrismaClient['nodePool'];
 type TemplateDelegate = PrismaClient['scenarioTemplate'];
 type TelemetryDelegate = PrismaClient['loadControlTelemetrySample'];
 
+type PersistedRunRecord = ControlRunRecord & {
+  definition: LoadTestRunDefinition;
+};
+
 type LoadControlNodeRecord = {
   id: string;
   poolId: string;
@@ -50,9 +54,9 @@ export class ControlRepository {
       update: this.toRunUpdateInput(draft),
     });
 
-    const mapped = this.mapRun(record);
-    await this.redis.setJson(this.runCacheKey(mapped.id), mapped);
-    return mapped;
+    const persisted = this.mapPersistedRun(record);
+    await this.redis.setJson(this.runCacheKey(persisted.id), persisted);
+    return this.mapRun(record);
   }
 
   async listRuns(): Promise<ControlRunRecord[]> {
@@ -83,7 +87,7 @@ export class ControlRepository {
         role: input.role,
         healthStatus: input.healthStatus,
         maxConcurrency: input.maxConcurrency,
-        networkProfile: input.networkProfile,
+        networkProfile: input.networkProfile ?? Prisma.DbNull,
         labels: input.labels ?? {},
         lastSeenAt: this.toDateValue(input.lastSeenAt ?? new Date()),
       },
@@ -93,7 +97,7 @@ export class ControlRepository {
         role: input.role,
         healthStatus: input.healthStatus,
         maxConcurrency: input.maxConcurrency,
-        networkProfile: input.networkProfile,
+        networkProfile: input.networkProfile ?? Prisma.DbNull,
         labels: input.labels ?? {},
         lastSeenAt: this.toDateValue(input.lastSeenAt ?? new Date()),
       },
@@ -163,8 +167,8 @@ export class ControlRepository {
     return telemetry;
   }
 
-  async getRun(runId: string): Promise<ControlRunRecord | null> {
-    const cached = await this.redis.getJson<ControlRunRecord>(
+  async getRun(runId: string): Promise<PersistedRunRecord | null> {
+    const cached = await this.redis.getJson<PersistedRunRecord>(
       this.runCacheKey(runId),
     );
 
@@ -180,7 +184,7 @@ export class ControlRepository {
       return null;
     }
 
-    const mapped = this.mapRun(record);
+    const mapped = this.mapPersistedRun(record);
     await this.redis.setJson(this.runCacheKey(mapped.id), mapped);
     return mapped;
   }
@@ -194,9 +198,9 @@ export class ControlRepository {
       data: { status },
     });
 
-    const mapped = this.mapRun(record);
-    await this.redis.setJson(this.runCacheKey(mapped.id), mapped);
-    return mapped;
+    const persisted = this.mapPersistedRun(record);
+    await this.redis.setJson(this.runCacheKey(persisted.id), persisted);
+    return this.mapRun(record);
   }
 
   private get runDelegate(): RunDelegate {
@@ -228,6 +232,7 @@ export class ControlRepository {
       nodePoolId: draft.nodePoolId,
       mode: definition.mode,
       targetBaseUrl: definition.targetBaseUrl,
+      definition,
       status: 'DRAFT',
       tags: definition.tags,
     };
@@ -241,6 +246,7 @@ export class ControlRepository {
       nodePoolId: draft.nodePoolId,
       mode: definition.mode,
       targetBaseUrl: definition.targetBaseUrl,
+      definition,
       status: 'DRAFT',
       tags: definition.tags,
     };
@@ -263,9 +269,9 @@ export class ControlRepository {
     id: string;
     templateId: string;
     nodePoolId: string;
-    mode: Prisma.ValidationMode;
+    mode: LoadTestRunDefinition['mode'];
     targetBaseUrl: string;
-    status: Prisma.RunStatus;
+    status: RunStatus;
     tags: Prisma.JsonValue;
     createdAt: Date;
     updatedAt: Date;
@@ -280,6 +286,24 @@ export class ControlRepository {
       tags: this.toStringRecord(record.tags),
       createdAt: record.createdAt.toISOString(),
       updatedAt: record.updatedAt.toISOString(),
+    };
+  }
+
+  private mapPersistedRun(record: {
+    id: string;
+    templateId: string;
+    nodePoolId: string;
+    mode: LoadTestRunDefinition['mode'];
+    targetBaseUrl: string;
+    status: RunStatus;
+    tags: Prisma.JsonValue;
+    definition: Prisma.JsonValue;
+    createdAt: Date;
+    updatedAt: Date;
+  }): PersistedRunRecord {
+    return {
+      ...this.mapRun(record),
+      definition: record.definition as LoadTestRunDefinition,
     };
   }
 
