@@ -13,6 +13,11 @@ describe('repo layout', () => {
     expect(existsSync('.gitignore')).toBe(true);
     expect(existsSync('.env.example')).toBe(true);
     expect(existsSync('docker-compose.yml')).toBe(true);
+    expect(
+      existsSync(
+        'docs/superpowers/guides/2026-04-18-load-testing-saas-operator-guide.md',
+      ),
+    ).toBe(true);
     expect(existsSync('apps/api/package.json')).toBe(true);
     expect(existsSync('apps/load-control/package.json')).toBe(true);
     expect(existsSync('apps/load-control/prisma/schema.prisma')).toBe(true);
@@ -41,6 +46,7 @@ describe('repo layout', () => {
     expect(rootPackage.scripts?.postinstall).toContain('pnpm --filter api prisma:generate');
     expect(rootPackage.scripts?.test).toContain('pnpm --filter load-control test');
     expect(rootPackage.scripts?.test).toContain('pnpm --filter load-control test:e2e');
+    expect(rootPackage.scripts?.test).toContain('pnpm --filter admin test');
     expect(rootPackage.scripts?.test).toContain('pnpm --filter api prisma:generate');
     expect(rootPackage.scripts?.test).toContain(
       'pnpm --filter load-control prisma:generate',
