@@ -18,3 +18,4 @@ package-lock.json
 .codex_tmp_openai_skills.zip
 .superpowers/brainstorm/
 .worktrees/
+apps/load-control/prisma/generated/
