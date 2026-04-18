@@ -1,4 +1,6 @@
 import {
+  type NodeHealthStatus,
+  type NodeTelemetrySample,
   type NodeRunSummary,
   type PlannedNodeAssignment,
   type RequestTemplate,
@@ -24,6 +26,12 @@ export type ProbeResult = {
   latencyMs: number;
 };
 
+export type AgentTelemetryCallback = (
+  sample: NodeTelemetrySample,
+) => Promise<void> | void;
+
+export type AgentStopCallback = () => Promise<boolean> | boolean;
+
 export interface TargetProbe {
   execute(request: ProbeRequest): Promise<ProbeResult>;
 }
@@ -35,6 +43,11 @@ export interface AgentRunnerScheduler {
 
 export interface AgentRunnerOptions {
   workerLaunchIntervalMs?: number;
+}
+
+export interface AgentRunnerRunHooks {
+  onTelemetry?: AgentTelemetryCallback;
+  shouldStop?: AgentStopCallback;
 }
 
 const phasePoolPlan: Array<{
@@ -71,6 +84,7 @@ export class AgentRunner {
 
   async runAssignment(
     assignment: PlannedNodeAssignment,
+    hooks: AgentRunnerRunHooks = {},
   ): Promise<NodeRunSummary> {
     const assignmentStartedAtMs = this.scheduler.now();
     const scheduledPhases = assignment.phases.map((phase) => ({
@@ -96,6 +110,7 @@ export class AgentRunner {
         assignment,
         scheduledPhase.phase,
         scheduledPhase.phaseStartAtMs,
+        hooks,
       );
     }
 
@@ -121,11 +136,54 @@ export class AgentRunner {
     assignment: PlannedNodeAssignment,
     phase: ScenarioPhase,
     phaseStartAtMs: number,
+    hooks: AgentRunnerRunHooks,
   ) {
     const phaseEndsAtMs = phaseStartAtMs + phase.durationMs;
+    const hasTelemetry = hooks.onTelemetry !== undefined;
     let requestCount = 0;
     let successCount = 0;
     let totalLatencyMs = 0;
+    let activeWorkers = 0;
+    const latencies: number[] = [];
+    let stopRequested = false;
+    const shouldStop = hooks.shouldStop
+      ? async (): Promise<boolean> => {
+          if (stopRequested) {
+            return true;
+          }
+
+          stopRequested = await hooks.shouldStop!();
+          return stopRequested;
+        }
+      : undefined;
+    const emitTelemetry = async (): Promise<void> => {
+      if (!hasTelemetry) {
+        return;
+      }
+
+      await hooks.onTelemetry(
+        this.buildTelemetrySample({
+          assignment,
+          phase,
+          phaseStartAtMs,
+          requestCount,
+          successCount,
+          totalLatencyMs,
+          latencies,
+          activeWorkers,
+          stopRequested,
+        }),
+      );
+    };
+    const recordResult = (result: ProbeResult): void => {
+      requestCount += 1;
+      totalLatencyMs += result.latencyMs;
+      latencies.push(result.latencyMs);
+
+      if (result.success) {
+        successCount += 1;
+      }
+    };
 
     const workers = phasePoolPlan.flatMap(({ pool, key }) =>
       Array.from({ length: phase[key] as number }, (_, requestIndex) =>
@@ -135,19 +193,39 @@ export class AgentRunner {
           pool,
           requestIndex,
           phaseEndsAtMs,
-          onResult: (result) => {
-            requestCount += 1;
-            totalLatencyMs += result.latencyMs;
-
-            if (result.success) {
-              successCount += 1;
-            }
-          },
+          shouldStop,
+          onStart: hasTelemetry
+            ? async () => {
+                activeWorkers += 1;
+                await emitTelemetry();
+              }
+            : undefined,
+          onResult: hasTelemetry
+            ? async (result) => {
+                recordResult(result);
+                activeWorkers -= 1;
+                await emitTelemetry();
+              }
+            : recordResult,
+          onStop: hasTelemetry
+            ? async () => {
+                await emitTelemetry();
+              }
+            : undefined,
         }),
       ),
     );
 
-    await Promise.all(workers);
+    const telemetryLoop = hasTelemetry
+      ? this.runTelemetryLoop({
+          phaseEndsAtMs,
+          shouldStop: shouldStop ?? (async () => false),
+          emitTelemetry,
+        })
+      : Promise.resolve();
+
+    await Promise.all([telemetryLoop, ...workers]);
+    await emitTelemetry();
 
     return {
       phaseId: phase.id,
@@ -163,28 +241,52 @@ export class AgentRunner {
     pool,
     requestIndex,
     phaseEndsAtMs,
+    shouldStop,
+    onStart,
     onResult,
+    onStop,
   }: {
     assignment: PlannedNodeAssignment;
     phase: ScenarioPhase;
     pool: RequestPool;
     requestIndex: number;
     phaseEndsAtMs: number;
-    onResult: (result: ProbeResult) => void;
+    shouldStop?: () => Promise<boolean>;
+    onStart?: () => Promise<void>;
+    onResult?: (result: ProbeResult) => void | Promise<void>;
+    onStop?: () => Promise<void>;
   }): Promise<void> {
     let nextLaunchAtMs = this.scheduler.now();
 
     while (nextLaunchAtMs < phaseEndsAtMs) {
+      if (shouldStop && (await shouldStop())) {
+        await onStop?.();
+        break;
+      }
+
       const sleepPromise = this.sleepUntil(nextLaunchAtMs);
 
       if (sleepPromise) {
         await sleepPromise;
-      }
-
-      if (this.scheduler.now() >= phaseEndsAtMs) {
+        if (
+          this.scheduler.now() >= phaseEndsAtMs ||
+          (shouldStop ? await shouldStop() : false)
+        ) {
+          if (onStop) {
+            await onStop();
+          }
+          break;
+        }
+      } else if (this.scheduler.now() >= phaseEndsAtMs) {
+        if (onStop) {
+          await onStop();
+        }
         break;
       }
 
+      if (onStart) {
+        await onStart();
+      }
       const result = await this.probe.execute({
         assignment,
         phase,
@@ -193,8 +295,41 @@ export class AgentRunner {
         requestIndex,
       });
 
-      onResult(result);
+      if (onResult) {
+        const maybePromise = onResult(result);
+
+        if (maybePromise && typeof (maybePromise as Promise<void>).then === 'function') {
+          await maybePromise;
+        }
+      }
       nextLaunchAtMs += this.workerLaunchIntervalMs;
+    }
+  }
+
+  private async runTelemetryLoop({
+    phaseEndsAtMs,
+    shouldStop,
+    emitTelemetry,
+  }: {
+    phaseEndsAtMs: number;
+    shouldStop: () => Promise<boolean>;
+    emitTelemetry: () => Promise<void>;
+  }): Promise<void> {
+    let nextTelemetryAtMs = this.scheduler.now();
+
+    while (nextTelemetryAtMs <= phaseEndsAtMs) {
+      if (await shouldStop()) {
+        break;
+      }
+
+      await emitTelemetry();
+      nextTelemetryAtMs += this.workerLaunchIntervalMs;
+
+      const sleepPromise = this.sleepUntil(nextTelemetryAtMs);
+
+      if (sleepPromise) {
+        await sleepPromise;
+      }
     }
   }
 
@@ -204,5 +339,78 @@ export class AgentRunner {
     return remainingDelayMs > 0
       ? this.scheduler.sleep(remainingDelayMs)
       : null;
+  }
+
+  private buildTelemetrySample({
+    assignment,
+    phase,
+    phaseStartAtMs,
+    requestCount,
+    successCount,
+    totalLatencyMs,
+    latencies,
+    activeWorkers,
+    stopRequested,
+  }: {
+    assignment: PlannedNodeAssignment;
+    phase: ScenarioPhase;
+    phaseStartAtMs: number;
+    requestCount: number;
+    successCount: number;
+    totalLatencyMs: number;
+    latencies: number[];
+    activeWorkers: number;
+    stopRequested: boolean;
+  }): NodeTelemetrySample {
+    const elapsedMs = Math.max(1, this.scheduler.now() - phaseStartAtMs);
+    const errorRate =
+      requestCount === 0 ? 0 : (requestCount - successCount) / requestCount;
+
+    return {
+      runId: assignment.runId,
+      nodeId: assignment.nodeId,
+      phaseId: phase.id,
+      status: this.deriveTelemetryStatus({
+        activeWorkers,
+        errorRate,
+        stopRequested,
+      }),
+      qps: requestCount === 0 ? 0 : (requestCount * 1_000) / elapsedMs,
+      errorRate,
+      p95LatencyMs:
+        latencies.length === 0 ? 0 : this.percentile(latencies, 95),
+      activeWorkers,
+      recordedAt: new Date(this.scheduler.now()).toISOString(),
+    };
+  }
+
+  private deriveTelemetryStatus({
+    activeWorkers,
+    errorRate,
+    stopRequested,
+  }: {
+    activeWorkers: number;
+    errorRate: number;
+    stopRequested: boolean;
+  }): NodeHealthStatus {
+    if (stopRequested) {
+      return 'OFFLINE';
+    }
+
+    if (errorRate >= 0.25) {
+      return 'DEGRADED';
+    }
+
+    return activeWorkers > 0 ? 'BUSY' : 'ONLINE';
+  }
+
+  private percentile(values: number[], percentile: number): number {
+    const sortedValues = [...values].sort((left, right) => left - right);
+    const index = Math.min(
+      sortedValues.length - 1,
+      Math.max(0, Math.ceil((percentile / 100) * sortedValues.length) - 1),
+    );
+
+    return sortedValues[index] ?? 0;
   }
 }

@@ -2,8 +2,17 @@ import {
   type LoadTestRunDefinition,
   type NodeRegistration,
   type NodeRunSummary,
+  type NodeTelemetrySample,
   type PlannedNodeAssignment,
+  type RunStatus,
 } from '@ticketing/contracts';
+
+export type ControlRunSnapshot = {
+  definition: LoadTestRunDefinition;
+  status: RunStatus;
+  assignments?: PlannedNodeAssignment[];
+  summaries?: NodeRunSummary[];
+};
 
 export class HttpControlClient {
   constructor(
@@ -20,12 +29,23 @@ export class HttpControlClient {
     });
   }
 
-  async getRun(runId: string): Promise<LoadTestRunDefinition & {
-    assignments?: PlannedNodeAssignment[];
-  }> {
+  async getRun(runId: string): Promise<ControlRunSnapshot> {
     return this.request('/runs/' + encodeURIComponent(runId), {
       method: 'GET',
     });
+  }
+
+  async postTelemetry(
+    runId: string,
+    sample: NodeTelemetrySample,
+  ): Promise<NodeTelemetrySample> {
+    return this.request<NodeTelemetrySample>(
+      '/runs/' + encodeURIComponent(runId) + '/telemetry',
+      {
+        method: 'POST',
+        body: sample,
+      },
+    );
   }
 
   async submitSummary(

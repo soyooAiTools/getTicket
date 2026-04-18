@@ -1,7 +1,15 @@
-import { type NodeRegistration } from '@ticketing/contracts';
+import {
+  type NodeRegistration,
+  type PlannedNodeAssignment,
+  type RunStatus,
+  type NodeTelemetrySample,
+} from '@ticketing/contracts';
 
 import { AgentRunner, type TargetProbe } from './agent-runner';
-import { HttpControlClient } from './http-control.client';
+import {
+  HttpControlClient,
+  type ControlRunSnapshot,
+} from './http-control.client';
 
 type EnvSource = Record<string, string | undefined>;
 
@@ -34,6 +42,20 @@ function readNumberEnv(
 ): number {
   const value = readEnv(env, names, String(defaultValue));
   return value ? Number(value) : defaultValue;
+}
+
+const defaultSleep = (ms: number): Promise<void> =>
+  ms <= 0 ? Promise.resolve() : new Promise((resolve) => setTimeout(resolve, ms));
+
+const terminalRunStatuses: RunStatus[] = ['STOPPED', 'COMPLETED', 'FAILED'];
+
+export interface AgentBootstrapOptions {
+  controlClient?: HttpControlClient;
+  runner?: AgentRunner;
+  probe?: TargetProbe;
+  sleep?: (ms: number) => Promise<void>;
+  statusPollIntervalMs?: number;
+  telemetryLaunchIntervalMs?: number;
 }
 
 export function readControlBaseUrl(
@@ -96,28 +118,96 @@ export function readNodeRegistration(
   };
 }
 
-export async function bootstrap() {
-  const controlBaseUrl = readControlBaseUrl();
-  const controlClient = new HttpControlClient(controlBaseUrl);
-  const node = readNodeRegistration();
-  const runId = readRunId();
+export async function waitForRunningRun(
+  controlClient: Pick<HttpControlClient, 'getRun'>,
+  runId: string,
+  sleep: (ms: number) => Promise<void> = defaultSleep,
+  statusPollIntervalMs = 1_000,
+): Promise<ControlRunSnapshot> {
+  for (;;) {
+    const run = await controlClient.getRun(runId);
 
-  await controlClient.registerNode(node);
-  const run = await controlClient.getRun(runId);
-  const assignment = run.assignments?.find((entry) => entry.nodeId === node.id);
+    if (run.status === 'RUNNING') {
+      return run;
+    }
 
-  if (!assignment) {
-    throw new Error(`No assignment found for node ${node.id} in run ${runId}`);
+    if (terminalRunStatuses.includes(run.status)) {
+      throw new Error(
+        `Run ${runId} reached terminal status ${run.status} before starting.`,
+      );
+    }
+
+    await sleep(statusPollIntervalMs);
   }
+}
 
-  const probe: TargetProbe = {
+function createDefaultProbe(node: NodeRegistration): TargetProbe {
+  return {
     async execute() {
       return { success: true, latencyMs: node.networkProfile.baseLatencyMs };
     },
   };
+}
 
-  const runner = new AgentRunner(probe);
-  const summary = await runner.runAssignment(assignment);
+function findAssignment(
+  run: ControlRunSnapshot,
+  nodeId: string,
+): PlannedNodeAssignment {
+  const assignment = run.assignments?.find((entry) => entry.nodeId === nodeId);
+
+  if (!assignment) {
+    throw new Error(`No assignment found for node ${nodeId} in run ${run.definition.id}`);
+  }
+
+  return assignment;
+}
+
+function createTelemetryPoster(
+  controlClient: Pick<HttpControlClient, 'postTelemetry'>,
+  runId: string,
+): (sample: NodeTelemetrySample) => Promise<void> {
+  return async (sample) => {
+    await controlClient.postTelemetry(runId, sample);
+  };
+}
+
+function createRunStopChecker(
+  controlClient: Pick<HttpControlClient, 'getRun'>,
+  runId: string,
+): () => Promise<boolean> {
+  return async () => {
+    const run = await controlClient.getRun(runId);
+    return run.status !== 'RUNNING';
+  };
+}
+
+export async function bootstrap(
+  env: EnvSource = process.env,
+  options: AgentBootstrapOptions = {},
+) {
+  const controlBaseUrl = readControlBaseUrl(env);
+  const controlClient = options.controlClient ?? new HttpControlClient(controlBaseUrl);
+  const node = readNodeRegistration(env);
+  const runId = readRunId(env);
+
+  await controlClient.registerNode(node);
+  const runningRun = await waitForRunningRun(
+    controlClient,
+    runId,
+    options.sleep ?? defaultSleep,
+    options.statusPollIntervalMs,
+  );
+  const assignment = findAssignment(runningRun, node.id);
+  const probe = options.probe ?? createDefaultProbe(node);
+  const runner =
+    options.runner ??
+    new AgentRunner(probe, undefined, {
+      workerLaunchIntervalMs: options.telemetryLaunchIntervalMs,
+    });
+  const summary = await runner.runAssignment(assignment, {
+    onTelemetry: createTelemetryPoster(controlClient, runId),
+    shouldStop: createRunStopChecker(controlClient, runId),
+  });
   await controlClient.submitSummary(runId, summary);
 }
 

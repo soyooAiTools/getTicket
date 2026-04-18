@@ -1,4 +1,5 @@
 import {
+  type NodeTelemetrySample,
   type PlannedNodeAssignment,
   type ScenarioPhase,
 } from '@ticketing/contracts';
@@ -429,6 +430,107 @@ describe('AgentRunner', () => {
         phaseId: 'main',
         requestCount: 4,
         successCount: 4,
+        averageLatencyMs: 1,
+      },
+    ]);
+  });
+
+  it('emits live telemetry samples while the phase is running', async () => {
+    const scheduler = new FakeScheduler();
+    const telemetrySamples: NodeTelemetrySample[] = [];
+
+    const probe: TargetProbe = {
+      async execute() {
+        await scheduler.sleep(2);
+
+        return { success: true, latencyMs: 2 };
+      },
+    };
+    const runner = createRunner(probe, scheduler);
+
+    const summary = await scheduler.runUntilSettled(
+      runner.runAssignment(
+        createAssignment([
+          {
+            id: 'live',
+            startsAtOffsetMs: 0,
+            durationMs: 6,
+            queryConcurrency: 1,
+            queuePollingConcurrency: 0,
+            inventoryLockConcurrency: 0,
+            orderSubmissionConcurrency: 0,
+          },
+        ]),
+        {
+          onTelemetry: async (sample) => {
+            telemetrySamples.push(sample);
+          },
+        },
+      ),
+    );
+
+    expect(telemetrySamples.length).toBeGreaterThan(1);
+    expect(
+      telemetrySamples.some(
+        (sample) =>
+          sample.runId === 'run-01' &&
+          sample.nodeId === 'node-a' &&
+          sample.phaseId === 'live',
+      ),
+    ).toBe(true);
+    expect(
+      telemetrySamples.every((sample) => sample.recordedAt.endsWith('Z')),
+    ).toBe(true);
+    expect(summary.phaseSummaries).toEqual([
+      {
+        phaseId: 'live',
+        requestCount: expect.any(Number),
+        successCount: expect.any(Number),
+        averageLatencyMs: expect.any(Number),
+      },
+    ]);
+  });
+
+  it('honors the stop callback before launching additional worker iterations', async () => {
+    const scheduler = new FakeScheduler();
+    let stopChecks = 0;
+
+    const probe: TargetProbe = {
+      async execute() {
+        await scheduler.sleep(1);
+
+        return { success: true, latencyMs: 1 };
+      },
+    };
+    const runner = createRunner(probe, scheduler);
+
+    const summary = await scheduler.runUntilSettled(
+      runner.runAssignment(
+        createAssignment([
+          {
+            id: 'stop',
+            startsAtOffsetMs: 0,
+            durationMs: 20,
+            queryConcurrency: 1,
+            queuePollingConcurrency: 0,
+            inventoryLockConcurrency: 0,
+            orderSubmissionConcurrency: 0,
+          },
+        ]),
+        {
+          shouldStop: async () => {
+            stopChecks += 1;
+            return stopChecks > 1;
+          },
+        },
+      ),
+    );
+
+    expect(summary.phaseSummaries).toEqual([
+      {
+        phaseId: 'stop',
+        requestCount: 1,
+        successCount: 1,
         averageLatencyMs: 1,
       },
     ]);
