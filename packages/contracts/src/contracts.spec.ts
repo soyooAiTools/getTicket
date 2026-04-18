@@ -19,6 +19,8 @@ import {
   loadTestRunDefinitionSchema,
   networkProfileSchema,
   miniappSessionSchema,
+  liveRunNodeSchema,
+  liveRunAlertSchema,
   runStatusSchema,
   scenarioTemplateSchema,
   wechatPaymentIntentSchema,
@@ -464,51 +466,110 @@ describe('shared contracts', () => {
         id: 'template-preprod-01',
         name: 'Preprod release window',
         description: 'Baseline release-window template.',
-        status: 'ACTIVE',
-        targetBaseUrl: 'https://preprod-api.example.com',
-        nodePoolId: 'pool-hk-anchor',
-        tags: {
-          cohort: 'release-window',
+        definition: {
+          id: 'run_preprod_20260417_001',
+          mode: 'PREPROD',
+          targetBaseUrl: 'https://preprod-api.example.com',
+          inventoryPoolId: 'inventory-main',
+          maxGlobalQps: 2400,
+          maxNodeConcurrency: 180,
+          tags: {
+            cohort: 'release-window',
+          },
+          requestTemplates: {
+            query: {
+              method: 'GET',
+              path: '/api/catalog/events',
+              timeoutMs: 1500,
+            },
+            queue: {
+              method: 'GET',
+              path: '/api/queue/status',
+              timeoutMs: 1500,
+            },
+            inventoryLock: {
+              method: 'POST',
+              path: '/api/checkout/draft-orders',
+              timeoutMs: 2500,
+            },
+            orderSubmit: {
+              method: 'POST',
+              path: '/api/orders/submit',
+              timeoutMs: 2500,
+            },
+          },
+          phases: [
+            {
+              id: 'warmup',
+              startsAtOffsetMs: 0,
+              durationMs: 1500000,
+              queryConcurrency: 30,
+              queuePollingConcurrency: 0,
+              inventoryLockConcurrency: 0,
+              orderSubmissionConcurrency: 0,
+            },
+          ],
         },
-        requestTemplates: {
-          query: {
-            method: 'GET',
-            path: '/api/catalog/events',
-            timeoutMs: 1500,
-          },
-          queue: {
-            method: 'GET',
-            path: '/api/queue/status',
-            timeoutMs: 1500,
-          },
-          inventoryLock: {
-            method: 'POST',
-            path: '/api/checkout/draft-orders',
-            timeoutMs: 2500,
-          },
-          orderSubmit: {
-            method: 'POST',
-            path: '/api/orders/submit',
-            timeoutMs: 2500,
-          },
-        },
-        phases: [
-          {
-            id: 'warmup',
-            startsAtOffsetMs: 0,
-            durationMs: 1500000,
-            queryConcurrency: 30,
-            queuePollingConcurrency: 0,
-            inventoryLockConcurrency: 0,
-            orderSubmissionConcurrency: 0,
-          },
-        ],
       }),
     ).toMatchObject({
       id: 'template-preprod-01',
-      status: 'ACTIVE',
-      nodePoolId: 'pool-hk-anchor',
+      definition: {
+        mode: 'PREPROD',
+      },
     });
+  });
+
+  it('rejects a scenario template payload without a description', () => {
+    expect(() =>
+      scenarioTemplateSchema.parse({
+        id: 'template-preprod-01',
+        name: 'Preprod release window',
+        definition: {
+          id: 'run_preprod_20260417_001',
+          mode: 'PREPROD',
+          targetBaseUrl: 'https://preprod-api.example.com',
+          inventoryPoolId: 'inventory-main',
+          maxGlobalQps: 2400,
+          maxNodeConcurrency: 180,
+          tags: {
+            cohort: 'release-window',
+          },
+          requestTemplates: {
+            query: {
+              method: 'GET',
+              path: '/api/catalog/events',
+              timeoutMs: 1500,
+            },
+            queue: {
+              method: 'GET',
+              path: '/api/queue/status',
+              timeoutMs: 1500,
+            },
+            inventoryLock: {
+              method: 'POST',
+              path: '/api/checkout/draft-orders',
+              timeoutMs: 2500,
+            },
+            orderSubmit: {
+              method: 'POST',
+              path: '/api/orders/submit',
+              timeoutMs: 2500,
+            },
+          },
+          phases: [
+            {
+              id: 'warmup',
+              startsAtOffsetMs: 0,
+              durationMs: 1500000,
+              queryConcurrency: 30,
+              queuePollingConcurrency: 0,
+              inventoryLockConcurrency: 0,
+              orderSubmissionConcurrency: 0,
+            },
+          ],
+        },
+      }),
+    ).toThrow();
   });
 
   it('validates a node pool payload', () => {
@@ -518,7 +579,7 @@ describe('shared contracts', () => {
         name: 'Hong Kong anchor pool',
         region: 'hk',
         role: 'ANCHOR',
-        status: 'HEALTHY',
+        status: 'ONLINE',
         maxConcurrency: 180,
         nodeCount: 1,
         activeNodeCount: 1,
@@ -528,7 +589,7 @@ describe('shared contracts', () => {
       }),
     ).toMatchObject({
       id: 'pool-hk-anchor',
-      status: 'HEALTHY',
+      status: 'ONLINE',
       nodeCount: 1,
     });
   });
@@ -539,9 +600,9 @@ describe('shared contracts', () => {
         id: 'run-control-01',
         templateId: 'template-preprod-01',
         nodePoolId: 'pool-hk-anchor',
+        mode: 'PREPROD',
+        targetBaseUrl: 'https://preprod-api.example.com',
         status: 'DRAFT',
-        requestedBy: 'ops@example.com',
-        requestedAt: '2026-04-18T09:30:00.000Z',
         tags: {
           release: '2026-04-18',
         },
@@ -559,14 +620,14 @@ describe('shared contracts', () => {
         id: 'run-control-01',
         templateId: 'template-preprod-01',
         nodePoolId: 'pool-hk-anchor',
+        mode: 'PREPROD',
+        targetBaseUrl: 'https://preprod-api.example.com',
         status: 'RUNNING',
-        requestedBy: 'ops@example.com',
-        requestedAt: '2026-04-18T09:30:00.000Z',
-        startedAt: '2026-04-18T09:35:00.000Z',
-        completedAt: null,
         tags: {
           release: '2026-04-18',
         },
+        createdAt: '2026-04-18T09:30:00.000Z',
+        updatedAt: '2026-04-18T09:35:00.000Z',
       }),
     ).toMatchObject({
       status: 'RUNNING',
@@ -575,8 +636,13 @@ describe('shared contracts', () => {
   });
 
   it('validates a node health status payload through the planned symbol', () => {
-    expect(nodeHealthStatusSchema.parse('HEALTHY')).toBe('HEALTHY');
+    expect(nodeHealthStatusSchema.parse('ONLINE')).toBe('ONLINE');
+    expect(nodeHealthStatusSchema.parse('DEGRADED')).toBe('DEGRADED');
+    expect(nodeHealthStatusSchema.parse('OFFLINE')).toBe('OFFLINE');
+    expect(nodeHealthStatusSchema.parse('BUSY')).toBe('BUSY');
     expect(runStatusSchema.parse('PLANNED')).toBe('PLANNED');
+    expect(runStatusSchema.parse('STOPPING')).toBe('STOPPING');
+    expect(runStatusSchema.parse('STOPPED')).toBe('STOPPED');
   });
 
   it('validates a node telemetry sample payload', () => {
@@ -584,81 +650,58 @@ describe('shared contracts', () => {
       nodeTelemetrySampleSchema.parse({
         runId: 'run-control-01',
         nodeId: 'node-hk-1',
-        poolId: 'pool-hk-anchor',
-        capturedAt: '2026-04-18T09:40:00.000Z',
-        status: 'HEALTHY',
+        phaseId: 'peak',
+        status: 'BUSY',
         qps: 218.5,
         errorRate: 0.012,
-        p50LatencyMs: 185,
         p95LatencyMs: 240,
-        activeRequests: 28,
+        activeWorkers: 28,
+        recordedAt: '2026-04-18T09:40:00.000Z',
       }),
     ).toMatchObject({
       runId: 'run-control-01',
-      status: 'HEALTHY',
+      phaseId: 'peak',
+      status: 'BUSY',
       qps: 218.5,
     });
   });
 
   it('validates a live run snapshot payload', () => {
+    const node = liveRunNodeSchema.parse({
+      nodeId: 'node-hk-1',
+      status: 'ONLINE',
+      qps: 218.5,
+      errorRate: 0.012,
+      p95LatencyMs: 240,
+      activeWorkers: 28,
+      recordedAt: '2026-04-18T09:40:00.000Z',
+    });
+
+    const alert = liveRunAlertSchema.parse({
+      id: 'alert-001',
+      severity: 'WARN',
+      message: 'One node is busy',
+      recordedAt: '2026-04-18T09:40:00.000Z',
+    });
+
     expect(
       liveRunSnapshotSchema.parse({
-        run: {
-          id: 'run-control-01',
-          templateId: 'template-preprod-01',
-          nodePoolId: 'pool-hk-anchor',
-          status: 'RUNNING',
-          requestedBy: 'ops@example.com',
-          requestedAt: '2026-04-18T09:30:00.000Z',
-          startedAt: '2026-04-18T09:35:00.000Z',
-          completedAt: null,
-          tags: {
-            release: '2026-04-18',
-          },
-        },
-        nodePool: {
-          id: 'pool-hk-anchor',
-          name: 'Hong Kong anchor pool',
-          region: 'hk',
-          role: 'ANCHOR',
-          status: 'HEALTHY',
-          maxConcurrency: 180,
-          nodeCount: 1,
-          activeNodeCount: 1,
-          labels: {
-            tier: 'primary',
-          },
-        },
-        telemetrySamples: [
-          {
-            runId: 'run-control-01',
-            nodeId: 'node-hk-1',
-            poolId: 'pool-hk-anchor',
-            capturedAt: '2026-04-18T09:40:00.000Z',
-            status: 'HEALTHY',
-            qps: 218.5,
-            errorRate: 0.012,
-            p50LatencyMs: 185,
-            p95LatencyMs: 240,
-            activeRequests: 28,
-          },
-        ],
-        capturedAt: '2026-04-18T09:40:00.000Z',
+        runId: 'run-control-01',
+        status: 'RUNNING',
         currentPhaseId: 'peak',
-        activeNodeCount: 1,
-        unhealthyNodeCount: 0,
         aggregateQps: 218.5,
         aggregateErrorRate: 0.012,
-        aggregateP50LatencyMs: 185,
         aggregateP95LatencyMs: 240,
+        activeNodeCount: 1,
+        unhealthyNodeCount: 0,
+        nodes: [node],
+        alerts: [alert],
+        updatedAt: '2026-04-18T09:40:00.000Z',
       }),
     ).toMatchObject({
-      run: {
-        status: 'RUNNING',
-      },
-      nodePool: {
-        id: 'pool-hk-anchor',
-      },
+      runId: 'run-control-01',
+      status: 'RUNNING',
+      currentPhaseId: 'peak',
     });
   });
 

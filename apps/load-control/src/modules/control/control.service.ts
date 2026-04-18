@@ -5,10 +5,13 @@ import {
 } from '@nestjs/common';
 
 import {
+  type ControlRunDraft,
+  type ControlRunRecord,
   type LoadTestRunDefinition,
   type NodeRegistration,
   type NodeRunSummary,
   type PlannedNodeAssignment,
+  type RunStatus,
 } from '@ticketing/contracts';
 
 import { ScenarioEngineService } from '../scenarios/scenario-engine.service';
@@ -17,7 +20,7 @@ import { ControlRepository } from './control.repository';
 
 export type StoredRun = {
   definition: LoadTestRunDefinition;
-  status: 'DRAFT' | 'PLANNED' | 'COMPLETED';
+  status: RunStatus;
   assignments: PlannedNodeAssignment[];
   summaries: NodeRunSummary[];
 };
@@ -45,7 +48,7 @@ export class ControlService {
     );
   }
 
-  createRun(definition: LoadTestRunDefinition): StoredRun {
+  async createRun(definition: LoadTestRunDefinition): Promise<StoredRun> {
     const run: StoredRun = {
       definition,
       status: 'DRAFT',
@@ -54,11 +57,20 @@ export class ControlService {
     };
 
     this.runs.set(definition.id, run);
+    await this.persistRunDraft(definition);
     return run;
   }
 
-  planRun(runId: string): StoredRun {
-    const run = this.getRun(runId);
+  async listRuns(): Promise<ControlRunRecord[]> {
+    if (this.controlRepository) {
+      return this.controlRepository.listRuns();
+    }
+
+    return [...this.runs.values()].map((run) => this.toControlRunRecord(run));
+  }
+
+  async planRun(runId: string): Promise<StoredRun> {
+    const run = await this.getRun(runId);
     this.validationPolicy.assertAllowed(run.definition);
     const assignments = this.scenarioEngineService.planRun(
       run.definition,
@@ -68,7 +80,22 @@ export class ControlService {
     return this.storeAssignments(runId, assignments);
   }
 
-  getRun(runId: string): StoredRun {
+  async getRun(runId: string): Promise<StoredRun> {
+    if (this.controlRepository) {
+      const persisted = await this.controlRepository.getRun(runId);
+
+      if (!persisted) {
+        throw new NotFoundException(`Unknown run: ${runId}`);
+      }
+
+      const storedRun = this.runs.get(runId);
+
+      if (storedRun) {
+        storedRun.status = persisted.status;
+        return storedRun;
+      }
+    }
+
     const run = this.runs.get(runId);
 
     if (!run) {
@@ -78,18 +105,19 @@ export class ControlService {
     return run;
   }
 
-  storeAssignments(
+  async storeAssignments(
     runId: string,
     assignments: PlannedNodeAssignment[],
-  ): StoredRun {
-    const run = this.getRun(runId);
+  ): Promise<StoredRun> {
+    const run = await this.getRun(runId);
     run.assignments = assignments;
     run.status = 'PLANNED';
+    await this.updateRunStatus(runId, 'PLANNED');
     return run;
   }
 
-  recordSummary(runId: string, summary: NodeRunSummary): StoredRun {
-    const run = this.getRun(runId);
+  async recordSummary(runId: string, summary: NodeRunSummary): Promise<StoredRun> {
+    const run = await this.getRun(runId);
     this.assertSummaryMatchesAssignment(run, summary);
 
     const nextSummaries = run.summaries.filter(
@@ -99,7 +127,58 @@ export class ControlService {
     nextSummaries.push(summary);
     run.summaries = nextSummaries;
     run.status = this.hasCollectedAllSummaries(run) ? 'COMPLETED' : 'PLANNED';
+    await this.updateRunStatus(runId, run.status);
     return run;
+  }
+
+  async updateRunStatus(runId: string, status: RunStatus): Promise<void> {
+    const run = this.runs.get(runId);
+
+    if (run) {
+      run.status = status;
+    }
+
+    if (!this.controlRepository) {
+      return;
+    }
+
+    await this.controlRepository.updateRunStatus(runId, status);
+  }
+
+  private async persistRunDraft(
+    definition: LoadTestRunDefinition,
+  ): Promise<void> {
+    if (!this.controlRepository) {
+      return;
+    }
+
+    const draft: ControlRunDraft = {
+      id: definition.id,
+      templateId: definition.id,
+      nodePoolId: definition.inventoryPoolId ?? definition.id,
+      mode: definition.mode,
+      targetBaseUrl: definition.targetBaseUrl,
+      status: 'DRAFT',
+      tags: definition.tags,
+    };
+
+    await this.controlRepository.createRunDraft(draft);
+  }
+
+  private toControlRunRecord(run: StoredRun): ControlRunRecord {
+    const now = new Date().toISOString();
+
+    return {
+      id: run.definition.id,
+      templateId: run.definition.id,
+      nodePoolId: run.definition.inventoryPoolId ?? run.definition.id,
+      mode: run.definition.mode,
+      targetBaseUrl: run.definition.targetBaseUrl,
+      status: run.status,
+      tags: run.definition.tags,
+      createdAt: now,
+      updatedAt: now,
+    };
   }
 
   private assertSummaryMatchesAssignment(

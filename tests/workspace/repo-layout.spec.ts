@@ -50,8 +50,8 @@ describe('repo layout', () => {
       'dev:agent': 'ts-node src/agent/main.ts',
       test: 'jest',
       'test:e2e': 'jest --config test/jest-e2e.json',
-      'prisma:generate': 'prisma generate',
-      'prisma:migrate': 'prisma migrate dev',
+      'prisma:generate': 'prisma generate --schema prisma/schema.prisma',
+      'prisma:migrate': 'prisma migrate dev --schema prisma/schema.prisma',
       lint: 'eslint src test --ext .ts',
     });
     expect(

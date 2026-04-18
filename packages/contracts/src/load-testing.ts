@@ -115,37 +115,25 @@ export const runStatusSchema = z.enum([
   'DRAFT',
   'PLANNED',
   'RUNNING',
-  'PAUSED',
+  'STOPPING',
+  'STOPPED',
   'COMPLETED',
   'FAILED',
-  'CANCELLED',
 ]);
 
 export const nodeHealthStatusSchema = z.enum([
-  'UNKNOWN',
-  'HEALTHY',
+  'ONLINE',
   'DEGRADED',
-  'UNHEALTHY',
   'OFFLINE',
-]);
-
-export const scenarioTemplateStatusSchema = z.enum([
-  'DRAFT',
-  'ACTIVE',
-  'ARCHIVED',
+  'BUSY',
 ]);
 
 export const scenarioTemplateSchema = z
   .object({
     id: z.string().min(1),
     name: z.string().min(1),
-    description: z.string().min(1).optional(),
-    status: scenarioTemplateStatusSchema,
-    targetBaseUrl: z.string().url(),
-    nodePoolId: z.string().min(1),
-    tags: z.record(z.string(), z.string()),
-    requestTemplates: requestTemplatesSchema,
-    phases: z.array(scenarioPhaseSchema).min(1),
+    description: z.string().min(1),
+    definition: loadTestRunDefinitionSchema,
   })
   .strict();
 
@@ -159,7 +147,6 @@ export const nodePoolSchema = z
     maxConcurrency: z.number().int().positive(),
     nodeCount: z.number().int().nonnegative(),
     activeNodeCount: z.number().int().nonnegative(),
-    networkProfile: networkProfileSchema.optional(),
     labels: z.record(z.string(), z.string()),
   })
   .strict();
@@ -169,17 +156,17 @@ export const controlRunDraftSchema = z
     id: z.string().min(1),
     templateId: z.string().min(1),
     nodePoolId: z.string().min(1),
+    mode: validationModeSchema,
+    targetBaseUrl: z.string().url(),
     status: runStatusSchema,
-    requestedBy: z.string().min(1),
-    requestedAt: z.string().datetime(),
     tags: z.record(z.string(), z.string()),
   })
   .strict();
 
 export const controlRunRecordSchema = controlRunDraftSchema
   .extend({
-    startedAt: z.string().datetime().nullable(),
-    completedAt: z.string().datetime().nullable(),
+    createdAt: z.string().datetime(),
+    updatedAt: z.string().datetime(),
   })
   .strict();
 
@@ -187,30 +174,50 @@ export const nodeTelemetrySampleSchema = z
   .object({
     runId: z.string().min(1),
     nodeId: z.string().min(1),
-    poolId: z.string().min(1),
-    capturedAt: z.string().datetime(),
+    phaseId: z.string().min(1),
     status: nodeHealthStatusSchema,
     qps: z.number().nonnegative(),
     errorRate: z.number().min(0).max(1),
-    p50LatencyMs: z.number().nonnegative(),
     p95LatencyMs: z.number().nonnegative(),
-    activeRequests: z.number().int().nonnegative(),
+    activeWorkers: z.number().int().nonnegative(),
+    recordedAt: z.string().datetime(),
+  })
+  .strict();
+
+export const liveRunNodeSchema = z
+  .object({
+    nodeId: z.string().min(1),
+    status: nodeHealthStatusSchema,
+    qps: z.number().nonnegative(),
+    errorRate: z.number().min(0).max(1),
+    p95LatencyMs: z.number().nonnegative(),
+    activeWorkers: z.number().int().nonnegative(),
+    recordedAt: z.string().datetime(),
+  })
+  .strict();
+
+export const liveRunAlertSchema = z
+  .object({
+    id: z.string().min(1),
+    severity: z.enum(['INFO', 'WARN', 'ERROR']),
+    message: z.string().min(1),
+    recordedAt: z.string().datetime(),
   })
   .strict();
 
 export const liveRunSnapshotSchema = z
   .object({
-    run: controlRunRecordSchema,
-    nodePool: nodePoolSchema,
-    telemetrySamples: z.array(nodeTelemetrySampleSchema),
-    capturedAt: z.string().datetime(),
+    runId: z.string().min(1),
+    status: runStatusSchema,
     currentPhaseId: z.string().min(1),
-    activeNodeCount: z.number().int().nonnegative(),
-    unhealthyNodeCount: z.number().int().nonnegative(),
     aggregateQps: z.number().nonnegative(),
     aggregateErrorRate: z.number().min(0).max(1),
-    aggregateP50LatencyMs: z.number().nonnegative(),
     aggregateP95LatencyMs: z.number().nonnegative(),
+    activeNodeCount: z.number().int().nonnegative(),
+    unhealthyNodeCount: z.number().int().nonnegative(),
+    nodes: z.array(liveRunNodeSchema),
+    alerts: z.array(liveRunAlertSchema),
+    updatedAt: z.string().datetime(),
   })
   .strict();
 
@@ -247,14 +254,13 @@ export type PhaseSummary = z.infer<typeof phaseSummarySchema>;
 export type NodeRunSummary = z.infer<typeof nodeRunSummarySchema>;
 export type RunStatus = z.infer<typeof runStatusSchema>;
 export type NodeHealthStatus = z.infer<typeof nodeHealthStatusSchema>;
-export type ScenarioTemplateStatus = z.infer<
-  typeof scenarioTemplateStatusSchema
->;
 export type ScenarioTemplate = z.infer<typeof scenarioTemplateSchema>;
 export type NodePool = z.infer<typeof nodePoolSchema>;
 export type ControlRunDraft = z.infer<typeof controlRunDraftSchema>;
 export type ControlRunRecord = z.infer<typeof controlRunRecordSchema>;
 export type NodeTelemetrySample = z.infer<typeof nodeTelemetrySampleSchema>;
+export type LiveRunNode = z.infer<typeof liveRunNodeSchema>;
+export type LiveRunAlert = z.infer<typeof liveRunAlertSchema>;
 export type LiveRunSnapshot = z.infer<typeof liveRunSnapshotSchema>;
 export type CalibrationRecommendation = z.infer<
   typeof calibrationRecommendationSchema

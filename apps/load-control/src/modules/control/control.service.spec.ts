@@ -116,10 +116,10 @@ describe('ControlService', () => {
     expect(service.listNodes()).toEqual([nodeRegistration]);
   });
 
-  it('createRun stores a draft run snapshot', () => {
+  it('createRun stores a draft run snapshot', async () => {
     const service = new ControlService();
 
-    expect(service.createRun(runDefinition)).toEqual({
+    await expect(service.createRun(runDefinition)).resolves.toEqual({
       definition: runDefinition,
       status: 'DRAFT',
       assignments: [],
@@ -127,15 +127,15 @@ describe('ControlService', () => {
     });
   });
 
-  it('getRun throws for a missing run', () => {
+  it('getRun throws for a missing run', async () => {
     const service = new ControlService();
 
-    expect(() => service.getRun('missing-run')).toThrow(
+    await expect(service.getRun('missing-run')).rejects.toThrow(
       'Unknown run: missing-run',
     );
   });
 
-  it('keeps a planned run open until every assigned node has reported', () => {
+  it('keeps a planned run open until every assigned node has reported', async () => {
     const service = new ControlService();
     const secondNode = {
       ...nodeRegistration,
@@ -145,14 +145,14 @@ describe('ControlService', () => {
 
     service.registerNode(nodeRegistration);
     service.registerNode(secondNode);
-    service.createRun(runDefinition);
-    service.planRun(runDefinition.id);
+    await service.createRun(runDefinition);
+    await service.planRun(runDefinition.id);
 
-    expect(service.recordSummary('run-01', makeSummary())).toMatchObject({
+    await expect(service.recordSummary('run-01', makeSummary())).resolves.toMatchObject({
       status: 'PLANNED',
     });
 
-    expect(
+    await expect(
       service.recordSummary(
         'run-01',
         makeSummary({
@@ -160,29 +160,29 @@ describe('ControlService', () => {
           region: 'ap-southeast-2',
         }),
       ),
-    ).toMatchObject({
+    ).resolves.toMatchObject({
       status: 'COMPLETED',
     });
   });
 
-  it('rejects summaries from nodes that are not assigned to the run', () => {
+  it('rejects summaries from nodes that are not assigned to the run', async () => {
     const service = new ControlService();
 
     service.registerNode(nodeRegistration);
-    service.createRun(runDefinition);
-    service.planRun(runDefinition.id);
+    await service.createRun(runDefinition);
+    await service.planRun(runDefinition.id);
 
-    expect(() =>
+    await expect(
       service.recordSummary(
         'run-01',
         makeSummary({
           nodeId: 'node-missing',
         }),
       ),
-    ).toThrow('Node node-missing is not assigned to run run-01.');
+    ).rejects.toThrow('Node node-missing is not assigned to run run-01.');
   });
 
-  it('rejects summaries that omit assigned phases and keeps the run open until a matching summary arrives', () => {
+  it('rejects summaries that omit assigned phases and keeps the run open until a matching summary arrives', async () => {
     const service = new ControlService();
     const secondNode = {
       ...nodeRegistration,
@@ -192,10 +192,10 @@ describe('ControlService', () => {
 
     service.registerNode(nodeRegistration);
     service.registerNode(secondNode);
-    service.createRun(multiPhaseRunDefinition);
-    service.planRun(multiPhaseRunDefinition.id);
+    await service.createRun(multiPhaseRunDefinition);
+    await service.planRun(multiPhaseRunDefinition.id);
 
-    expect(
+    await expect(
       service.recordSummary(
         'run-02',
         makeSummary({
@@ -203,11 +203,11 @@ describe('ControlService', () => {
           phaseIds: ['warmup', 'steady'],
         }),
       ),
-    ).toMatchObject({
+    ).resolves.toMatchObject({
       status: 'PLANNED',
     });
 
-    expect(() =>
+    await expect(
       service.recordSummary(
         'run-02',
         makeSummary({
@@ -217,11 +217,11 @@ describe('ControlService', () => {
           phaseIds: ['warmup'],
         }),
       ),
-    ).toThrow(
+    ).rejects.toThrow(
       'Summary for node node-02 must match assigned phases [steady, warmup]. Missing [steady].',
     );
 
-    expect(service.getRun('run-02')).toMatchObject({
+    await expect(service.getRun('run-02')).resolves.toMatchObject({
       status: 'PLANNED',
       summaries: [
         {
@@ -231,7 +231,7 @@ describe('ControlService', () => {
       ],
     });
 
-    expect(
+    await expect(
       service.recordSummary(
         'run-02',
         makeSummary({
@@ -241,19 +241,19 @@ describe('ControlService', () => {
           phaseIds: ['warmup', 'steady'],
         }),
       ),
-    ).toMatchObject({
+    ).resolves.toMatchObject({
       status: 'COMPLETED',
     });
   });
 
-  it('rejects summaries that include unexpected phases for the assigned node', () => {
+  it('rejects summaries that include unexpected phases for the assigned node', async () => {
     const service = new ControlService();
 
     service.registerNode(nodeRegistration);
-    service.createRun(multiPhaseRunDefinition);
-    service.planRun(multiPhaseRunDefinition.id);
+    await service.createRun(multiPhaseRunDefinition);
+    await service.planRun(multiPhaseRunDefinition.id);
 
-    expect(() =>
+    await expect(
       service.recordSummary(
         'run-02',
         makeSummary({
@@ -261,7 +261,7 @@ describe('ControlService', () => {
           phaseIds: ['warmup', 'steady', 'cooldown'],
         }),
       ),
-    ).toThrow(
+    ).rejects.toThrow(
       'Summary for node node-01 must match assigned phases [steady, warmup]. Unexpected [cooldown].',
     );
   });

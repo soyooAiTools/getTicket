@@ -1,57 +1,30 @@
 {
-  "run": {
-    "id": "run-control-live-1",
-    "templateId": "template-preprod-01",
-    "nodePoolId": "pool-hk-anchor",
-    "status": "RUNNING",
-    "requestedBy": "ops@example.com",
-    "requestedAt": "2026-04-18T09:30:00.000Z",
-    "startedAt": "2026-04-18T09:35:00.000Z",
-    "completedAt": null,
-    "tags": {
-      "release": "2026-04-18"
-    }
-  },
-  "nodePool": {
-    "id": "pool-hk-anchor",
-    "name": "Hong Kong anchor pool",
-    "region": "hk",
-    "role": "ANCHOR",
-    "status": "HEALTHY",
-    "maxConcurrency": 180,
-    "nodeCount": 1,
-    "activeNodeCount": 1,
-    "networkProfile": {
-      "id": "hk-anchor",
-      "label": "Hong Kong anchor",
-      "baseLatencyMs": 18,
-      "jitterMs": 4,
-      "packetLossRatio": 0.002
-    },
-    "labels": {
-      "tier": "primary"
-    }
-  },
-  "telemetrySamples": [
-    {
-      "runId": "run-control-live-1",
-      "nodeId": "node-hk-1",
-      "poolId": "pool-hk-anchor",
-      "capturedAt": "2026-04-18T09:40:00.000Z",
-      "status": "HEALTHY",
-      "qps": 218.5,
-      "errorRate": 0.012,
-      "p50LatencyMs": 185,
-      "p95LatencyMs": 240,
-      "activeRequests": 28
-    }
-  ],
-  "capturedAt": "2026-04-18T09:40:00.000Z",
+  "runId": "run-control-live-1",
+  "status": "RUNNING",
   "currentPhaseId": "peak",
-  "activeNodeCount": 1,
-  "unhealthyNodeCount": 0,
   "aggregateQps": 218.5,
   "aggregateErrorRate": 0.012,
-  "aggregateP50LatencyMs": 185,
-  "aggregateP95LatencyMs": 240
+  "aggregateP95LatencyMs": 240,
+  "activeNodeCount": 1,
+  "unhealthyNodeCount": 0,
+  "nodes": [
+    {
+      "nodeId": "node-hk-1",
+      "status": "ONLINE",
+      "qps": 218.5,
+      "errorRate": 0.012,
+      "p95LatencyMs": 240,
+      "activeWorkers": 28,
+      "recordedAt": "2026-04-18T09:40:00.000Z"
+    }
+  ],
+  "alerts": [
+    {
+      "id": "alert-001",
+      "severity": "WARN",
+      "message": "One node is busy",
+      "recordedAt": "2026-04-18T09:40:00.000Z"
+    }
+  ],
+  "updatedAt": "2026-04-18T09:40:00.000Z"
 }

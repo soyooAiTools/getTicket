@@ -74,14 +74,11 @@ describe('load testing fixtures', () => {
     const fixture = readJson<unknown>(fixturePath('live-run-snapshot.json'));
 
     expect(liveRunSnapshotSchema.parse(fixture)).toMatchObject({
-      run: {
-        id: 'run-control-live-1',
-        status: 'RUNNING',
-      },
-      nodePool: {
-        id: 'pool-hk-anchor',
-        status: 'HEALTHY',
-      },
+      runId: 'run-control-live-1',
+      status: 'RUNNING',
+      currentPhaseId: 'peak',
+      activeNodeCount: 1,
+      unhealthyNodeCount: 0,
     });
   });
 });

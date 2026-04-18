@@ -7,6 +7,13 @@ datasource db {
   url      = env("LOAD_CONTROL_DATABASE_URL")
 }
 
+enum ValidationMode {
+  PREPROD
+  OBSERVE_ONLY
+  WHITELIST_FULL_PATH
+  GRAY_VALIDATION
+}
+
 enum NodeRole {
   ANCHOR
   EDGE
@@ -17,62 +24,44 @@ enum RunStatus {
   DRAFT
   PLANNED
   RUNNING
-  PAUSED
+  STOPPING
+  STOPPED
   COMPLETED
   FAILED
-  CANCELLED
 }
 
 enum NodeHealthStatus {
-  UNKNOWN
-  HEALTHY
+  ONLINE
   DEGRADED
-  UNHEALTHY
   OFFLINE
-}
-
-enum ScenarioTemplateStatus {
-  DRAFT
-  ACTIVE
-  ARCHIVED
+  BUSY
 }
 
 model NodePool {
-  id                String                  @id
-  name              String
-  region            String
-  role              NodeRole
-  status            NodeHealthStatus
-  maxConcurrency    Int
-  nodeCount         Int                     @default(0)
-  activeNodeCount   Int                     @default(0)
-  networkProfile    Json?
-  labels            Json
-  createdAt         DateTime                @default(now())
-  updatedAt         DateTime                @updatedAt
-  nodes             LoadControlNode[]
-  scenarioTemplates ScenarioTemplate[]
-  runs              LoadControlRun[]
-  assignments       LoadControlAssignment[]
-  telemetrySamples  LoadControlTelemetrySample[]
+  id             String             @id
+  name           String
+  region         String
+  role           NodeRole
+  status         NodeHealthStatus
+  maxConcurrency Int
+  nodeCount      Int                @default(0)
+  activeNodeCount Int               @default(0)
+  labels         Json
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  nodes          LoadControlNode[]
+  runs           LoadControlRun[]
+  assignments    LoadControlAssignment[]
 }
 
 model ScenarioTemplate {
-  id             String          @id
-  name           String
-  description    String?
-  status         ScenarioTemplateStatus @default(DRAFT)
-  targetBaseUrl  String
-  nodePoolId     String
-  requestTemplates Json
-  phases         Json
-  tags           Json
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  nodePool       NodePool        @relation(fields: [nodePoolId], references: [id], onDelete: Cascade)
-  runs           LoadControlRun[]
-
-  @@index([nodePoolId, status])
+  id          String          @id
+  name        String
+  description String
+  definition  Json
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  runs        LoadControlRun[]
 }
 
 model LoadControlNode {
@@ -82,7 +71,7 @@ model LoadControlNode {
   role           NodeRole
   healthStatus   NodeHealthStatus
   maxConcurrency Int
-  networkProfile Json
+  networkProfile Json?
   labels         Json
   lastSeenAt     DateTime           @default(now())
   createdAt      DateTime           @default(now())
@@ -97,19 +86,17 @@ model LoadControlNode {
 }
 
 model LoadControlRun {
-  id             String              @id
+  id             String           @id
   templateId     String
   nodePoolId     String
-  status         RunStatus           @default(DRAFT)
-  requestedBy    String
-  requestedAt    DateTime            @default(now())
-  startedAt      DateTime?
-  completedAt    DateTime?
+  mode           ValidationMode
+  targetBaseUrl  String
+  status         RunStatus        @default(DRAFT)
   tags           Json
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-  template       ScenarioTemplate    @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  nodePool       NodePool            @relation(fields: [nodePoolId], references: [id], onDelete: Cascade)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  template       ScenarioTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  nodePool       NodePool         @relation(fields: [nodePoolId], references: [id], onDelete: Cascade)
   assignments    LoadControlAssignment[]
   summaries      LoadControlSummary[]
   telemetrySamples LoadControlTelemetrySample[]
@@ -119,15 +106,15 @@ model LoadControlRun {
 }
 
 model LoadControlAssignment {
-  id            String           @id @default(cuid())
-  runId         String
-  nodeId        String
-  poolId        String
-  phasePlan     Json
-  assignedAt    DateTime         @default(now())
-  run           LoadControlRun   @relation(fields: [runId], references: [id], onDelete: Cascade)
-  node          LoadControlNode  @relation(fields: [nodeId], references: [id], onDelete: Cascade)
-  pool          NodePool         @relation(fields: [poolId], references: [id], onDelete: Cascade)
+  id         String          @id @default(cuid())
+  runId      String
+  nodeId     String
+  poolId     String
+  phasePlan  Json
+  assignedAt DateTime        @default(now())
+  run        LoadControlRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  node       LoadControlNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  pool       NodePool        @relation(fields: [poolId], references: [id], onDelete: Cascade)
 
   @@unique([runId, nodeId])
   @@index([runId, assignedAt])
@@ -135,35 +122,33 @@ model LoadControlAssignment {
 }
 
 model LoadControlSummary {
-  id           String           @id @default(cuid())
-  runId        String
-  nodeId       String
-  payload      Json
-  reportedAt   DateTime         @default(now())
-  run          LoadControlRun   @relation(fields: [runId], references: [id], onDelete: Cascade)
-  node         LoadControlNode  @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  id         String          @id @default(cuid())
+  runId      String
+  nodeId     String
+  payload    Json
+  reportedAt DateTime        @default(now())
+  run        LoadControlRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  node       LoadControlNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
 
   @@unique([runId, nodeId])
   @@index([runId, reportedAt])
 }
 
 model LoadControlTelemetrySample {
-  id            String           @id @default(cuid())
+  id            String          @id @default(cuid())
   runId         String
   nodeId        String
-  poolId        String
-  capturedAt    DateTime
+  phaseId       String
   status        NodeHealthStatus
   qps           Float
   errorRate     Float
-  p50LatencyMs  Int
   p95LatencyMs  Int
-  activeRequests Int
-  run           LoadControlRun   @relation(fields: [runId], references: [id], onDelete: Cascade)
-  node          LoadControlNode  @relation(fields: [nodeId], references: [id], onDelete: Cascade)
-  pool          NodePool         @relation(fields: [poolId], references: [id], onDelete: Cascade)
+  activeWorkers  Int
+  recordedAt    DateTime
+  run           LoadControlRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  node          LoadControlNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
 
-  @@index([runId, capturedAt])
-  @@index([nodeId, capturedAt])
-  @@index([poolId, capturedAt])
+  @@index([runId, recordedAt])
+  @@index([nodeId, recordedAt])
+  @@index([phaseId, recordedAt])
 }
