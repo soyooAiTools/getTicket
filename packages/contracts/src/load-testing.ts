@@ -133,7 +133,7 @@ export const scenarioTemplateSchema = z
     id: z.string().min(1),
     name: z.string().min(1),
     description: z.string().min(1),
-    definition: loadTestRunDefinitionSchema,
+    definition: loadTestRunDefinitionSchema.omit({ id: true }),
   })
   .strict();
 
@@ -143,11 +143,8 @@ export const nodePoolSchema = z
     name: z.string().min(1),
     region: z.string().min(1),
     role: nodeRoleSchema,
-    status: nodeHealthStatusSchema,
-    maxConcurrency: z.number().int().positive(),
-    nodeCount: z.number().int().nonnegative(),
-    activeNodeCount: z.number().int().nonnegative(),
-    labels: z.record(z.string(), z.string()),
+    maxNodes: z.number().int().nonnegative(),
+    nodeIds: z.array(z.string().min(1)),
   })
   .strict();
 
@@ -156,15 +153,19 @@ export const controlRunDraftSchema = z
     id: z.string().min(1),
     templateId: z.string().min(1),
     nodePoolId: z.string().min(1),
+    definition: loadTestRunDefinitionSchema,
+  })
+  .strict();
+
+export const controlRunRecordSchema = z
+  .object({
+    id: z.string().min(1),
+    templateId: z.string().min(1),
+    nodePoolId: z.string().min(1),
     mode: validationModeSchema,
     targetBaseUrl: z.string().url(),
     status: runStatusSchema,
     tags: z.record(z.string(), z.string()),
-  })
-  .strict();
-
-export const controlRunRecordSchema = controlRunDraftSchema
-  .extend({
     createdAt: z.string().datetime(),
     updatedAt: z.string().datetime(),
   })
@@ -174,7 +175,7 @@ export const nodeTelemetrySampleSchema = z
   .object({
     runId: z.string().min(1),
     nodeId: z.string().min(1),
-    phaseId: z.string().min(1),
+    phaseId: z.string().min(1).nullable(),
     status: nodeHealthStatusSchema,
     qps: z.number().nonnegative(),
     errorRate: z.number().min(0).max(1),
@@ -184,10 +185,12 @@ export const nodeTelemetrySampleSchema = z
   })
   .strict();
 
-export const liveRunNodeSchema = z
+const liveRunNodeSchema = z
   .object({
     nodeId: z.string().min(1),
-    status: nodeHealthStatusSchema,
+    region: z.string().min(1),
+    role: nodeRoleSchema,
+    phaseId: z.string().min(1).nullable(),
     qps: z.number().nonnegative(),
     errorRate: z.number().min(0).max(1),
     p95LatencyMs: z.number().nonnegative(),
@@ -196,7 +199,7 @@ export const liveRunNodeSchema = z
   })
   .strict();
 
-export const liveRunAlertSchema = z
+const liveRunAlertSchema = z
   .object({
     id: z.string().min(1),
     severity: z.enum(['INFO', 'WARN', 'ERROR']),
@@ -209,7 +212,7 @@ export const liveRunSnapshotSchema = z
   .object({
     runId: z.string().min(1),
     status: runStatusSchema,
-    currentPhaseId: z.string().min(1),
+    currentPhaseId: z.string().min(1).nullable(),
     aggregateQps: z.number().nonnegative(),
     aggregateErrorRate: z.number().min(0).max(1),
     aggregateP95LatencyMs: z.number().nonnegative(),
@@ -259,8 +262,6 @@ export type NodePool = z.infer<typeof nodePoolSchema>;
 export type ControlRunDraft = z.infer<typeof controlRunDraftSchema>;
 export type ControlRunRecord = z.infer<typeof controlRunRecordSchema>;
 export type NodeTelemetrySample = z.infer<typeof nodeTelemetrySampleSchema>;
-export type LiveRunNode = z.infer<typeof liveRunNodeSchema>;
-export type LiveRunAlert = z.infer<typeof liveRunAlertSchema>;
 export type LiveRunSnapshot = z.infer<typeof liveRunSnapshotSchema>;
 export type CalibrationRecommendation = z.infer<
   typeof calibrationRecommendationSchema

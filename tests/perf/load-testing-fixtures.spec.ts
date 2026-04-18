@@ -76,9 +76,17 @@ describe('load testing fixtures', () => {
     expect(liveRunSnapshotSchema.parse(fixture)).toMatchObject({
       runId: 'run-control-live-1',
       status: 'RUNNING',
-      currentPhaseId: 'peak',
+      currentPhaseId: null,
       activeNodeCount: 1,
       unhealthyNodeCount: 0,
+      nodes: [
+        expect.objectContaining({
+          nodeId: 'node-hk-1',
+          region: 'hk',
+          role: 'CONTROL',
+          phaseId: null,
+        }),
+      ],
     });
   });
 });

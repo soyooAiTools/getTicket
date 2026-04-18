@@ -156,10 +156,7 @@ export class ControlService {
       id: definition.id,
       templateId: definition.id,
       nodePoolId: definition.inventoryPoolId ?? definition.id,
-      mode: definition.mode,
-      targetBaseUrl: definition.targetBaseUrl,
-      status: 'DRAFT',
-      tags: definition.tags,
+      definition,
     };
 
     await this.controlRepository.createRunDraft(draft);

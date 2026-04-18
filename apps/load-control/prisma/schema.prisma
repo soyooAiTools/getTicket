@@ -138,7 +138,7 @@ model LoadControlTelemetrySample {
   id            String          @id @default(cuid())
   runId         String
   nodeId        String
-  phaseId       String
+  phaseId       String?
   status        NodeHealthStatus
   qps           Float
   errorRate     Float

@@ -1,7 +1,7 @@
 {
   "runId": "run-control-live-1",
   "status": "RUNNING",
-  "currentPhaseId": "peak",
+  "currentPhaseId": null,
   "aggregateQps": 218.5,
   "aggregateErrorRate": 0.012,
   "aggregateP95LatencyMs": 240,
@@ -10,7 +10,9 @@
   "nodes": [
     {
       "nodeId": "node-hk-1",
-      "status": "ONLINE",
+      "region": "hk",
+      "role": "CONTROL",
+      "phaseId": null,
       "qps": 218.5,
       "errorRate": 0.012,
       "p95LatencyMs": 240,

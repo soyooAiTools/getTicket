@@ -104,6 +104,11 @@ export class ControlRepository {
 
   async listNodePools(): Promise<NodePool[]> {
     const records = await this.nodePoolDelegate.findMany({
+      include: {
+        nodes: {
+          select: { id: true },
+        },
+      },
       orderBy: { name: 'asc' },
     });
 
@@ -215,25 +220,29 @@ export class ControlRepository {
   }
 
   private toRunCreateInput(draft: ControlRunDraft): Prisma.LoadControlRunUncheckedCreateInput {
+    const { definition } = draft;
+
     return {
       id: draft.id,
       templateId: draft.templateId,
       nodePoolId: draft.nodePoolId,
-      mode: draft.mode,
-      targetBaseUrl: draft.targetBaseUrl,
-      status: draft.status,
-      tags: draft.tags,
+      mode: definition.mode,
+      targetBaseUrl: definition.targetBaseUrl,
+      status: 'DRAFT',
+      tags: definition.tags,
     };
   }
 
   private toRunUpdateInput(draft: ControlRunDraft): Prisma.LoadControlRunUncheckedUpdateInput {
+    const { definition } = draft;
+
     return {
       templateId: draft.templateId,
       nodePoolId: draft.nodePoolId,
-      mode: draft.mode,
-      targetBaseUrl: draft.targetBaseUrl,
-      status: draft.status,
-      tags: draft.tags,
+      mode: definition.mode,
+      targetBaseUrl: definition.targetBaseUrl,
+      status: 'DRAFT',
+      tags: definition.tags,
     };
   }
 
@@ -307,22 +316,18 @@ export class ControlRepository {
     name: string;
     region: string;
     role: NodeRole;
-    status: NodeHealthStatus;
-    maxConcurrency: number;
+    nodes: { id: string }[];
     nodeCount: number;
-    activeNodeCount: number;
-    labels: Prisma.JsonValue;
   }): NodePool {
+    const nodeIds = record.nodes.map((node) => node.id);
+
     return {
       id: record.id,
       name: record.name,
       region: record.region,
       role: record.role,
-      status: record.status,
-      maxConcurrency: record.maxConcurrency,
-      nodeCount: record.nodeCount,
-      activeNodeCount: record.activeNodeCount,
-      labels: this.toStringRecord(record.labels),
+      maxNodes: Math.max(record.nodeCount, nodeIds.length),
+      nodeIds,
     };
   }
 
@@ -332,18 +337,21 @@ export class ControlRepository {
     description: string;
     definition: Prisma.JsonValue;
   }): ScenarioTemplate {
+    const { id: _definitionId, ...definition } =
+      (record.definition as LoadTestRunDefinition) ?? {};
+
     return {
       id: record.id,
       name: record.name,
       description: record.description,
-      definition: record.definition as LoadTestRunDefinition,
+      definition: definition as Omit<LoadTestRunDefinition, 'id'>,
     };
   }
 
   private mapTelemetry(record: {
     runId: string;
     nodeId: string;
-    phaseId: string;
+    phaseId: string | null;
     status: NodeHealthStatus;
     qps: number;
     errorRate: number;
