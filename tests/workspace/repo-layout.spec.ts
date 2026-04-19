@@ -17,6 +17,7 @@ describe('repo layout', () => {
     expect(existsSync('apps/load-control/package.json')).toBe(true);
     expect(existsSync('apps/admin/package.json')).toBe(true);
     expect(existsSync('apps/miniapp/package.json')).toBe(true);
+    expect(existsSync('apps/pit-game/package.json')).toBe(true);
     expect(existsSync('packages/contracts/package.json')).toBe(true);
 
     const rootPackage = readJson<{
@@ -33,11 +34,13 @@ describe('repo layout', () => {
         'dev:load-control': expect.stringContaining('pnpm --filter load-control dev'),
         'dev:admin': expect.stringContaining('pnpm --filter admin dev'),
         'dev:miniapp': expect.stringContaining('pnpm --filter miniapp dev:weapp'),
+        'dev:pit-game': expect.stringContaining('pnpm --filter pit-game dev'),
         lint: expect.stringContaining('eslint tests'),
       }),
     );
     expect(rootPackage.scripts?.test).toContain('pnpm --filter load-control test');
     expect(rootPackage.scripts?.test).toContain('pnpm --filter load-control test:e2e');
+    expect(rootPackage.scripts?.test).toContain('pnpm --filter pit-game test');
     expect(rootPackage.scripts?.test).toContain(
       'pnpm exec vitest run tests/perf/load-testing-fixtures.spec.ts',
     );
@@ -88,6 +91,13 @@ describe('repo layout', () => {
     });
 
     expect(readJson<{ scripts: Record<string, string> }>('apps/admin/package.json').scripts).toEqual({
+      dev: 'vite',
+      build: 'tsc -b && vite build',
+      test: 'vitest run',
+      lint: 'eslint src --ext .ts,.tsx',
+    });
+
+    expect(readJson<{ scripts: Record<string, string> }>('apps/pit-game/package.json').scripts).toEqual({
       dev: 'vite',
       build: 'tsc -b && vite build',
       test: 'vitest run',
