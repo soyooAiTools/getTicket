@@ -1,85 +1,57 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-
-import { createElement } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-import { ReviewPanel } from '../../components/ReviewPanel';
-import { authoredSongProfile } from '../fixtures/authored-song-profile';
+import { createAnalysisDraft } from '../domain/analysis-draft';
 import {
-  acceptSectionReview,
-  applySectionOverride,
+  addImpactMarker,
   buildPlayableProfile,
   createReviewSession,
-  getLowConfidenceSections,
-  setReviewName,
-  setSectionChaos,
+  getAuthoringWarnings,
+  mergeSectionForward,
+  moveSectionBoundary,
+  splitSectionAtBeat,
 } from './review-session';
 
-describe('review session', () => {
-  it('surfaces uncertain sections and applies name, section, and chaos overrides', () => {
-    const session = createReviewSession({
-      ...authoredSongProfile,
-      sections: authoredSongProfile.sections.map((section, index) => ({
-        ...section,
-        confidence: index === 2 ? 0.52 : section.confidence,
-      })),
-    });
+const draft = createAnalysisDraft({
+  id: 'fan-edit',
+  sourceTitle: 'Fan Edit',
+  profile: {
+    id: 'fan-edit',
+    title: 'Fan Edit',
+    durationMs: 16_000,
+    bpm: 160,
+    beatGridMs: [0, 375, 750, 1_125, 1_500, 1_875, 2_250, 2_625, 3_000, 3_375, 3_750, 4_125, 7_875, 8_000, 11_250, 12_000, 13_125, 16_000],
+    sections: [
+      { kind: 'push', startMs: 0, endMs: 8_000, confidence: 0.58, chaos: 0.52 },
+      { kind: 'breakdown', startMs: 8_000, endMs: 12_000, confidence: 0.62, chaos: 0.88 },
+      { kind: 'recovery', startMs: 12_000, endMs: 16_000, confidence: 0.72, chaos: 0.2 },
+    ],
+    impacts: [{ atMs: 8_000, strength: 'drop' }],
+  },
+  sectionSuggestions: [],
+  impactCandidates: [{ atMs: 7_875, strength: 'hit', confidence: 0.77, reasons: ['transient cluster'] }],
+  warnings: [],
+});
 
-    expect(getLowConfidenceSections(session)).toHaveLength(1);
+describe('review session authoring', () => {
+  it('snaps section edits to the nearest beat and preserves full coverage', () => {
+    const moved = moveSectionBoundary(createReviewSession(draft), 0, 'end', 7_880);
 
-    const renamed = setReviewName(session, 'Weekend Chain');
-    const relabeled = applySectionOverride(renamed, 2, 'two-step');
-    const adjusted = setSectionChaos(relabeled, 2, 0.84);
-    const playable = buildPlayableProfile(adjusted);
-
-    expect(playable.title).toBe('Weekend Chain');
-    expect(playable.sections[2].kind).toBe('two-step');
-    expect(playable.sections[2].chaos).toBe(0.84);
+    expect(moved.overlay.sections[0]?.endMs).toBe(7_875);
+    expect(moved.overlay.sections[1]?.startMs).toBe(7_875);
   });
 
-  it('allows a low-confidence section to be accepted without changing its label', () => {
-    const session = createReviewSession({
-      ...authoredSongProfile,
-      sections: authoredSongProfile.sections.map((section, index) => ({
-        ...section,
-        confidence: index === 2 ? 0.52 : section.confidence,
-      })),
-    });
+  it('supports split, merge, and user-authored impact markers', () => {
+    const split = splitSectionAtBeat(createReviewSession(draft), 0, 4_100);
+    const merged = mergeSectionForward(split, 0);
+    const withImpact = addImpactMarker(merged, { atMs: 11_250, strength: 'stop' });
 
-    expect(getLowConfidenceSections(session)).toHaveLength(1);
-
-    const accepted = acceptSectionReview(session, 2);
-
-    expect(getLowConfidenceSections(accepted)).toHaveLength(0);
-    expect(buildPlayableProfile(accepted).sections[2]).toMatchObject({
-      kind: authoredSongProfile.sections[2].kind,
-      confidence: 1,
-    });
+    expect(withImpact.overlay.impacts.some((item) => item.strength === 'stop')).toBe(true);
+    expect(buildPlayableProfile(withImpact).impacts.some((item) => item.strength === 'stop')).toBe(true);
   });
 
-  it('renders an explicit accept-current-label action for low-confidence sections', () => {
-    const session = createReviewSession({
-      ...authoredSongProfile,
-      sections: authoredSongProfile.sections.map((section, index) => ({
-        ...section,
-        confidence: index === 2 ? 0.52 : section.confidence,
-      })),
-    });
+  it('warns when recovery contains drop markers', () => {
+    const session = addImpactMarker(createReviewSession(draft), { atMs: 13_100, strength: 'drop' });
 
-    const markup = renderToStaticMarkup(
-      createElement(ReviewPanel, {
-        session,
-        onChange: () => undefined,
-        onSave: () => undefined,
-        onPlay: () => undefined,
-      }),
-    );
-    const styles = readFileSync(join(process.cwd(), 'src/styles.css'), 'utf8');
-
-    expect(markup).toContain('Accept Current Label');
-    expect(markup).toContain('class="form-control"');
-    expect(styles).toContain('.form-control');
+    expect(getAuthoringWarnings(session)).toContain('recovery-drop-2');
   });
 });
