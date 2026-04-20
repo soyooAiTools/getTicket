@@ -13,4 +13,13 @@ describe('createVerticalSliceFrame', () => {
     expect(frame.recommendedAction).toBe('brace');
     expect(frame.cameraCue).toBe('punch');
   });
+
+  it('surfaces lateral surges as slip windows with a build camera cue', () => {
+    const frame = createVerticalSliceFrame(minorityThreatVerticalSlice, 7_500);
+
+    expect(frame.phase.kind).toBe('breakdown-peak');
+    expect(frame.event?.kind).toBe('lateral-surge');
+    expect(frame.recommendedAction).toBe('slip');
+    expect(frame.cameraCue).toBe('build');
+  });
 });

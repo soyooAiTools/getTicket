@@ -1,5 +1,9 @@
 import type { VerticalSliceFixture } from '../domain/vertical-slice';
-import { createVerticalSliceFrame, type VerticalSliceFrame } from '../domain/vertical-slice-director';
+import {
+  createVerticalSliceFrame,
+  getVerticalSliceWindowKey,
+  type VerticalSliceFrame,
+} from '../domain/vertical-slice-director';
 
 export type VerticalSliceZone = 'front' | 'center' | 'edge' | 'side';
 export type VerticalSliceAction = 'idle' | 'move' | 'shove' | 'brace' | 'slip';
@@ -34,6 +38,13 @@ export interface VerticalSliceSession {
   downCount: number;
   hitWindows: number;
 }
+
+const SCORED_WINDOW_KEYS = Symbol('vertical-slice-scored-window-keys');
+const MAX_STEP_SLICE_MS = 100;
+
+type VerticalSliceSessionState = VerticalSliceSession & {
+  [SCORED_WINDOW_KEYS]: ReadonlySet<string>;
+};
 
 function createVerticalSlicePlayerState(): VerticalSlicePlayerState {
   return {
@@ -82,7 +93,7 @@ function resolvePlayerPose(
 }
 
 export function createVerticalSliceSession(fixture: VerticalSliceFixture): VerticalSliceSession {
-  return {
+  const session: VerticalSliceSessionState = {
     fixture,
     elapsedMs: 0,
     frame: createVerticalSliceFrame(fixture, 0),
@@ -92,29 +103,25 @@ export function createVerticalSliceSession(fixture: VerticalSliceFixture): Verti
     summary: null,
     downCount: 0,
     hitWindows: 0,
+    [SCORED_WINDOW_KEYS]: new Set<string>(),
   };
+
+  return session;
 }
 
-export function stepVerticalSliceSession(
+function getScoredWindowKeys(session: VerticalSliceSession): ReadonlySet<string> {
+  return (session as VerticalSliceSessionState)[SCORED_WINDOW_KEYS] ?? new Set<string>();
+}
+
+function stepVerticalSliceSessionSlice(
   session: VerticalSliceSession,
   input: VerticalSliceInput,
   dtMs: number,
-): VerticalSliceSession {
-  if (session.failed || session.completed) {
-    return session;
-  }
-
-  const remainingMs = session.fixture.profile.durationMs - session.elapsedMs;
-  const safeDtMs = Math.min(dtMs, remainingMs);
-
-  if (safeDtMs <= 0) {
-    return session;
-  }
-
-  const elapsedMs = session.elapsedMs + safeDtMs;
+): VerticalSliceSessionState {
+  const elapsedMs = session.elapsedMs + dtMs;
   const frameAtMs = Math.min(elapsedMs, session.fixture.profile.durationMs - 1);
   const frame = createVerticalSliceFrame(session.fixture, frameAtMs);
-  const seconds = safeDtMs / 1_000;
+  const seconds = dtMs / 1_000;
   const pressure = frame.zonePressure[input.targetZone] * seconds * 0.32;
   const mitigation = resolveMitigationPerSecond(input.action) * seconds;
   const staminaDrainPerSecond = input.action === 'idle' ? 8 : 16;
@@ -122,7 +129,15 @@ export function stepVerticalSliceSession(
   const stamina = Math.max(0, session.player.stamina - staminaDrainPerSecond * seconds);
   const failed = balance === 0;
   const completed = !failed && elapsedMs >= session.fixture.profile.durationMs;
-  const hitWindows = session.hitWindows + (matchesRecommendedAction(frame, input.action) ? 1 : 0);
+  const scoredWindowKeys = new Set(getScoredWindowKeys(session));
+  const windowKey = getVerticalSliceWindowKey(frame);
+  const isNewHitWindow = matchesRecommendedAction(frame, input.action) && !scoredWindowKeys.has(windowKey);
+
+  if (isNewHitWindow) {
+    scoredWindowKeys.add(windowKey);
+  }
+
+  const hitWindows = session.hitWindows + (isNewHitWindow ? 1 : 0);
   const downCount = session.downCount + (failed ? 1 : 0);
   const playerFeedback = resolvePlayerPose(input.action, balance);
 
@@ -149,5 +164,38 @@ export function stepVerticalSliceSession(
         : null,
     downCount,
     hitWindows,
+    [SCORED_WINDOW_KEYS]: scoredWindowKeys,
   };
+}
+
+export function stepVerticalSliceSession(
+  session: VerticalSliceSession,
+  input: VerticalSliceInput,
+  dtMs: number,
+): VerticalSliceSession {
+  if (session.failed || session.completed) {
+    return session;
+  }
+
+  const availableMs = session.fixture.profile.durationMs - session.elapsedMs;
+  const safeDtMs = Math.min(dtMs, availableMs);
+
+  if (safeDtMs <= 0) {
+    return session;
+  }
+
+  let current = session;
+  let remainingMs = safeDtMs;
+
+  while (remainingMs > 0) {
+    const sliceMs = Math.min(remainingMs, MAX_STEP_SLICE_MS);
+    current = stepVerticalSliceSessionSlice(current, input, sliceMs);
+    remainingMs -= sliceMs;
+
+    if (current.failed || current.completed) {
+      break;
+    }
+  }
+
+  return current;
 }

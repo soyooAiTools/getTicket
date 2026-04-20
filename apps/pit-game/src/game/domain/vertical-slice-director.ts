@@ -95,3 +95,11 @@ export function createVerticalSliceFrame(fixture: VerticalSliceFixture, atMs: nu
     lightCue: 'aftershock',
   };
 }
+
+export function getVerticalSliceWindowKey(frame: VerticalSliceFrame): string {
+  if (frame.event) {
+    return `event:${frame.event.kind}:${frame.event.atMs}`;
+  }
+
+  return `phase:${frame.phase.kind}:${frame.phase.startMs}:${frame.phase.endMs}`;
+}
