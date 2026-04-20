@@ -18,3 +18,7 @@ package-lock.json
 .codex_tmp_openai_skills.zip
 .superpowers/brainstorm/
 .worktrees/
+_codex_research/
+research/luna_tmp/
+outcome.tar.gz
+packages/contracts/src/*.js
