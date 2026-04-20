@@ -37,6 +37,11 @@ body {
   margin-bottom: 12px;
 }
 
+.review-actions {
+  display: grid;
+  gap: 8px;
+}
+
 .control-column {
   display: grid;
   gap: 20px;

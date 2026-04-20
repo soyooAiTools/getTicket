@@ -1,5 +1,6 @@
 import type { SectionKind, SongProfile } from '../game/domain/song-profile';
 import {
+  acceptSectionReview,
   applySectionOverride,
   buildPlayableProfile,
   getLowConfidenceSections,
@@ -36,19 +37,28 @@ export function ReviewPanel({ session, onChange, onPlay }: ReviewPanelProps) {
           <span>
             {section.startMs}ms - {section.endMs}ms
           </span>
-          <select
-            className='form-control'
-            value={session.overrides.sectionKinds[index] ?? section.kind}
-            onChange={(event) =>
-              onChange(applySectionOverride(session, index, event.target.value as SectionKind))
-            }
-          >
-            {sectionKinds.map((kind) => (
-              <option key={kind} value={kind}>
-                {kind}
-              </option>
-            ))}
-          </select>
+          <div className='review-actions'>
+            <select
+              className='form-control'
+              value={session.overrides.sectionKinds[index] ?? section.kind}
+              onChange={(event) =>
+                onChange(applySectionOverride(session, index, event.target.value as SectionKind))
+              }
+            >
+              {sectionKinds.map((kind) => (
+                <option key={kind} value={kind}>
+                  {kind}
+                </option>
+              ))}
+            </select>
+            <button
+              type='button'
+              className='form-control'
+              onClick={() => onChange(acceptSectionReview(session, index))}
+            >
+              Accept Current Label
+            </button>
+          </div>
         </label>
       ))}
       <button

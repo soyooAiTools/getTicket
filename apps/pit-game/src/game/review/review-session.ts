@@ -4,6 +4,7 @@ export interface ReviewSession {
   draft: SongProfile;
   overrides: {
     sectionKinds: Record<number, SectionKind>;
+    reviewedSections: Record<number, true>;
   };
 }
 
@@ -12,6 +13,7 @@ export function createReviewSession(draft: SongProfile): ReviewSession {
     draft,
     overrides: {
       sectionKinds: {},
+      reviewedSections: {},
     },
   };
 }
@@ -19,7 +21,10 @@ export function createReviewSession(draft: SongProfile): ReviewSession {
 export function getLowConfidenceSections(session: ReviewSession) {
   return session.draft.sections
     .map((section, index) => ({ section, index }))
-    .filter(({ section }) => section.confidence < 0.7);
+    .filter(
+      ({ section, index }) =>
+        section.confidence < 0.7 && session.overrides.reviewedSections[index] !== true,
+    );
 }
 
 export function applySectionOverride(
@@ -35,6 +40,23 @@ export function applySectionOverride(
         ...session.overrides.sectionKinds,
         [index]: kind,
       },
+      reviewedSections: {
+        ...session.overrides.reviewedSections,
+        [index]: true,
+      },
+    },
+  };
+}
+
+export function acceptSectionReview(session: ReviewSession, index: number): ReviewSession {
+  return {
+    ...session,
+    overrides: {
+      ...session.overrides,
+      reviewedSections: {
+        ...session.overrides.reviewedSections,
+        [index]: true,
+      },
     },
   };
 }
@@ -45,7 +67,7 @@ export function buildPlayableProfile(session: ReviewSession): SongProfile {
     sections: session.draft.sections.map((section, index) => ({
       ...section,
       kind: session.overrides.sectionKinds[index] ?? section.kind,
-      confidence: session.overrides.sectionKinds[index] ? 1 : section.confidence,
+      confidence: session.overrides.reviewedSections[index] ? 1 : section.confidence,
     })),
   };
 }
