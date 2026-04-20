@@ -128,4 +128,24 @@ describe('review session authoring', () => {
       seed: '3750:9375',
     });
   });
+
+  it('clears preview state after editing a selected section', () => {
+    const selected = selectSection(createReviewSession(draft), 1);
+    const edited = moveSectionBoundary(selected, 1, 'start', 8_200);
+
+    expect(edited.selection).toBeNull();
+    expect(edited.loopRange).toBeNull();
+  });
+
+  it('clears preview state when overlay structure changes after selection', () => {
+    const selected = selectSection(createReviewSession(draft), 0);
+    const split = splitSectionAtBeat(selected, 0, 4_100);
+    const reselected = selectSection(split, 0);
+    const merged = mergeSectionForward(reselected, 0);
+
+    expect(split.selection).toBeNull();
+    expect(split.loopRange).toBeNull();
+    expect(merged.selection).toBeNull();
+    expect(merged.loopRange).toBeNull();
+  });
 });

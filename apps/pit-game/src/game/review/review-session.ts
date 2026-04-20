@@ -160,6 +160,8 @@ function withUpdatedOverlay(
       draft: session.draft,
       overlay,
     }),
+    selection: null,
+    loopRange: null,
   };
 }
 
