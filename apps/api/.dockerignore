@@ -1,0 +1,16 @@
+.git
+.github
+node_modules
+**/node_modules
+dist
+apps/api/dist
+coverage
+.nyc_output
+test
+apps/api/test
+src/**/*.spec.ts
+apps/api/src/**/*.spec.ts
+*.log
+.env
+.env.*
+!.env.example

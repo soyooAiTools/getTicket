@@ -38,15 +38,12 @@ class FakeScheduler implements AgentRunnerScheduler {
   }
 
   private async advanceTo(targetTimeMs: number): Promise<void> {
-    while (true) {
-      const nextWakeAtMs = Math.min(
-        ...this.sleepers.map((sleep) => sleep.wakeAtMs),
-        Number.POSITIVE_INFINITY,
-      );
+    let nextWakeAtMs = Math.min(
+      ...this.sleepers.map((sleep) => sleep.wakeAtMs),
+      Number.POSITIVE_INFINITY,
+    );
 
-      if (nextWakeAtMs > targetTimeMs) {
-        break;
-      }
+    while (nextWakeAtMs <= targetTimeMs) {
 
       this.currentTimeMs = nextWakeAtMs;
       const ready = this.sleepers.filter(
@@ -58,6 +55,11 @@ class FakeScheduler implements AgentRunnerScheduler {
 
       ready.forEach((sleep) => sleep.resolve());
       await flushMicrotasks();
+
+      nextWakeAtMs = Math.min(
+        ...this.sleepers.map((sleep) => sleep.wakeAtMs),
+        Number.POSITIVE_INFINITY,
+      );
     }
 
     this.currentTimeMs = targetTimeMs;

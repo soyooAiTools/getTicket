@@ -1,4 +1,4 @@
-const DEFAULT_API_BASE_URL = 'http://localhost:3000/api';
+const DEFAULT_API_BASE_URL = '/api';
 const API_BASE_URL_STORAGE_KEY = 'ticketing.admin.apiBaseUrl';
 const API_SECRET_STORAGE_KEY = 'ticketing.admin.apiSecret';
 
@@ -46,7 +46,7 @@ async function readErrorMessage(response: Response) {
 
 export async function request<TResponse>(
   path: string,
-  init: RequestInit = {},
+  init: globalThis.RequestInit = {},
 ): Promise<TResponse> {
   const headers = new Headers(init.headers);
   const adminSecret = readBrowserSetting(API_SECRET_STORAGE_KEY);

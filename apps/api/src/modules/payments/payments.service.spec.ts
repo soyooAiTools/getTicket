@@ -243,7 +243,7 @@ describe('PaymentsService', () => {
         }),
       );
 
-      const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
+      const requestInit = fetchMock.mock.calls[0]?.[1] as globalThis.RequestInit;
       expect(requestInit.headers).toMatchObject({
         'content-type': 'application/json',
         Authorization: expect.stringMatching(/^WECHATPAY2-SHA256-RSA2048 /),
