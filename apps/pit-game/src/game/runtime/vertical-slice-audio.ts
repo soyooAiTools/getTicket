@@ -14,7 +14,8 @@ export function buildSliceAudioElement(
   source: Pick<VerticalSliceAudioSource, 'segmentStartMs'>,
   objectUrl: string,
 ): HTMLAudioElement {
-  const audio = new Audio(objectUrl);
+  const audio = document.createElement('audio');
+  audio.src = objectUrl;
   audio.preload = 'auto';
   audio.currentTime = source.segmentStartMs / 1_000;
   return audio;

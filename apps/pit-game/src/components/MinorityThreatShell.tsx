@@ -19,18 +19,43 @@ export function MinorityThreatShell() {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioCleanupRef = useRef<(() => void) | null>(null);
   const ownedUrlRef = useRef<string | null>(null);
   const controllerRef = useRef(
     createVerticalSliceController(minorityThreatVerticalSlice),
   );
   const controller = controllerRef.current;
-  const [session, setSession] = useState(() => controller.getSnapshot());
   const [loadedFileName, setLoadedFileName] = useState<string | null>(null);
+  const [isAudioReady, setIsAudioReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [summaryText, setSummaryText] = useState<string | null>(() => {
+    const summary = controller.getSnapshot().summary;
+    return summary ? formatSummary(summary) : null;
+  });
+
+  const releaseAudio = (revokeObjectUrl: boolean) => {
+    audioCleanupRef.current?.();
+    audioCleanupRef.current = null;
+    audioRef.current?.pause();
+    audioRef.current = null;
+    setIsAudioReady(false);
+
+    if (revokeObjectUrl && ownedUrlRef.current) {
+      URL.revokeObjectURL(ownedUrlRef.current);
+      ownedUrlRef.current = null;
+      return;
+    }
+
+    if (!revokeObjectUrl) {
+      ownedUrlRef.current = null;
+    }
+  };
 
   useEffect(() => {
     return controller.subscribe((nextSession) => {
-      setSession(nextSession);
+      setSummaryText(
+        nextSession.summary ? formatSummary(nextSession.summary) : null,
+      );
     });
   }, [controller]);
 
@@ -50,7 +75,7 @@ export function MinorityThreatShell() {
 
         const game = createVerticalSliceGame(mountRef.current, controller);
         cleanup = () => {
-          game.destroy();
+          game.destroy(true);
         };
       },
     );
@@ -63,12 +88,7 @@ export function MinorityThreatShell() {
 
   useEffect(() => {
     return () => {
-      audioRef.current?.pause();
-
-      if (ownedUrlRef.current) {
-        URL.revokeObjectURL(ownedUrlRef.current);
-        ownedUrlRef.current = null;
-      }
+      releaseAudio(true);
     };
   }, []);
 
@@ -83,11 +103,7 @@ export function MinorityThreatShell() {
         <p>{minorityThreatVerticalSlice.audio.localPath}</p>
         {loadedFileName ? <p>Loaded: {loadedFileName}</p> : null}
         {error ? <p className='minority-shell__error'>{error}</p> : null}
-        {session.summary ? (
-          <p className='minority-shell__summary'>
-            {formatSummary(session.summary)}
-          </p>
-        ) : null}
+        {summaryText ? <p className='minority-shell__summary'>{summaryText}</p> : null}
       </div>
 
       <div className='minority-shell__actions'>
@@ -103,9 +119,16 @@ export function MinorityThreatShell() {
         <button
           type='button'
           className='form-control'
-          disabled={loadedFileName !== minorityThreatVerticalSlice.audio.fileName}
+          disabled={
+            loadedFileName !== minorityThreatVerticalSlice.audio.fileName ||
+            !isAudioReady
+          }
           onClick={() => {
-            if (!audioRef.current) {
+            if (
+              !audioRef.current ||
+              loadedFileName !== minorityThreatVerticalSlice.audio.fileName ||
+              !isAudioReady
+            ) {
               return;
             }
 
@@ -134,32 +157,39 @@ export function MinorityThreatShell() {
             const validationError = validateMinorityThreatFile(file);
 
             if (validationError) {
-              audioRef.current?.pause();
-
-              if (ownedUrlRef.current) {
-                URL.revokeObjectURL(ownedUrlRef.current);
-                ownedUrlRef.current = null;
-              }
-
-              audioRef.current = null;
+              releaseAudio(true);
               setLoadedFileName(null);
               setError(validationError);
               event.currentTarget.value = '';
               return;
             }
 
-            audioRef.current?.pause();
-
-            if (ownedUrlRef.current) {
-              URL.revokeObjectURL(ownedUrlRef.current);
-            }
+            releaseAudio(true);
 
             const objectUrl = URL.createObjectURL(file);
-            ownedUrlRef.current = objectUrl;
-            audioRef.current = buildSliceAudioElement(
+            const nextAudio = buildSliceAudioElement(
               minorityThreatVerticalSlice.audio,
               objectUrl,
             );
+            const handleLoadedMetadata = () => {
+              if (audioRef.current !== nextAudio) {
+                return;
+              }
+
+              setIsAudioReady(true);
+            };
+
+            nextAudio.addEventListener('loadedmetadata', handleLoadedMetadata);
+
+            audioCleanupRef.current = () => {
+              nextAudio.removeEventListener(
+                'loadedmetadata',
+                handleLoadedMetadata,
+              );
+            };
+            ownedUrlRef.current = objectUrl;
+            audioRef.current = nextAudio;
+            setIsAudioReady(nextAudio.readyState >= 1);
             setLoadedFileName(file.name);
             setError(null);
             event.currentTarget.value = '';
