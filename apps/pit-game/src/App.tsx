@@ -9,7 +9,7 @@ import { authoredSongProfile } from './game/fixtures/authored-song-profile';
 import { sampleProfileLibrary } from './game/fixtures/profile-library';
 import {
   hydrateSavedAuthoringProject,
-  saveReviewedProfile,
+  saveAuthoringProject,
   type SavedAuthoringProjectRecord,
 } from './game/persistence/song-profile-storage';
 import type { SongProfile } from './game/domain/song-profile';
@@ -205,16 +205,16 @@ export function App() {
           session={mode === 'reviewing' ? reviewSession : null}
           onChange={setReviewSession}
           saveMessage={reviewSaveMessage}
-          onSave={(draft) => {
-            const savedProfile = saveReviewedProfile(draft);
+          onSave={(session) => {
+            const savedProject = saveAuthoringProject(session);
 
-            if (savedProfile) {
+            if (savedProject) {
               setLibraryRevision((value) => value + 1);
-              setReviewSaveMessage(`Saved ${savedProfile.name} locally.`);
+              setReviewSaveMessage(`Saved ${savedProject.name} locally.`);
               return;
             }
 
-            setReviewSaveMessage('Could not save this profile in local storage.');
+            setReviewSaveMessage('Could not save this authoring project in local storage.');
           }}
           onPlay={(profile) => {
             controller.reset(profile);

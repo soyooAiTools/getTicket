@@ -1,7 +1,6 @@
 import type { SectionKind, SongProfile } from '../game/domain/song-profile';
 import {
   acceptSectionReview,
-  buildReviewedProfileDraft,
   applySectionOverride,
   buildPlayableProfile,
   getLowConfidenceSections,
@@ -13,7 +12,7 @@ import {
 interface ReviewPanelProps {
   session: ReviewSession | null;
   onChange(next: ReviewSession): void;
-  onSave(profile: ReturnType<typeof buildReviewedProfileDraft>): void;
+  onSave(session: ReviewSession): void;
   saveMessage?: string | null;
   onPlay(profile: SongProfile): void;
 }
@@ -94,7 +93,7 @@ export function ReviewPanel({ session, onChange, onSave, saveMessage, onPlay }: 
         </article>
       ))}
       <div className='review-footer'>
-        <button type='button' className='form-control' onClick={() => onSave(buildReviewedProfileDraft(session))}>
+        <button type='button' className='form-control' onClick={() => onSave(session)}>
           Save reviewed profile
         </button>
         <button type='button' className='form-control' onClick={() => onPlay(buildPlayableProfile(session))}>
