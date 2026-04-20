@@ -20,7 +20,7 @@ export function createGameSession(profile: SongProfile, elapsedMs = 0): GameSess
     profile,
     elapsedMs,
     frame,
-    crowd: createCrowdState(),
+    crowd: createCrowdState(frame),
     player: createPlayerState(),
     currentMission: frame.missionPool[0],
     failed: false,

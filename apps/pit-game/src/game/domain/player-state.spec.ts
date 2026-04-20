@@ -12,4 +12,14 @@ describe('player state', () => {
 
     expect(braced.balance).toBeGreaterThan(reckless.balance);
   });
+
+  it('keeps the same balance loss over the same real-time window', () => {
+    const frame = createShowFrame(authoredSongProfile, 61_000);
+    const singleStep = reducePlayerState(createPlayerState(), { action: 'two-step', targetZone: 'center' }, frame, 500);
+
+    const firstTick = reducePlayerState(createPlayerState(), { action: 'two-step', targetZone: 'center' }, frame, 250);
+    const secondTick = reducePlayerState(firstTick, { action: 'two-step', targetZone: 'center' }, frame, 250);
+
+    expect(secondTick.balance).toBeCloseTo(singleStep.balance, 6);
+  });
 });

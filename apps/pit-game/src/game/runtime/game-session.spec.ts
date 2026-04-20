@@ -15,4 +15,12 @@ describe('game session', () => {
     expect(session.currentMission).toBe('center-hold');
     expect(session.failed).toBe(true);
   });
+
+  it('seeds crowd state from the starting frame when created mid-song', () => {
+    const session = createGameSession(authoredSongProfile, 61_000);
+
+    expect(session.crowd.center.flow).toBe('collapse');
+    expect(session.crowd.center.density).toBe(0.88);
+    expect(session.crowd.edge.density).toBe(0.48);
+  });
 });

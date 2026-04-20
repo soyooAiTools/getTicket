@@ -16,14 +16,38 @@ export interface PlayerState {
   status: 'upright' | 'down';
 }
 
-const actionStaminaLoss: Record<PlayerAction, number> = {
-  idle: 2,
-  'two-step': 8,
-  shove: 6,
-  slip: 5,
-  brace: 4,
-  lift: 7,
+const actionStaminaLossPerSecond: Record<PlayerAction, number> = {
+  idle: 8,
+  'two-step': 32,
+  shove: 24,
+  slip: 20,
+  brace: 16,
+  lift: 28,
 };
+
+const actionPressurePerSecond: Partial<Record<PlayerAction, number>> = {
+  'two-step': 16,
+  shove: 8,
+  lift: 6,
+};
+
+const braceMitigationPerSecond = 24;
+const slipBonusPerSecond = 20;
+const breakthroughRespectPerSecond = 24;
+const standardRespectPerSecond = 4;
+const liftRespectPerSecond = 32;
+
+function getRespectRate(action: PlayerAction, frame: ShowFrame): number {
+  if (action === 'lift') {
+    return liftRespectPerSecond;
+  }
+
+  if (action === 'two-step' && frame.actionWeights.twoStep > 0.8) {
+    return breakthroughRespectPerSecond;
+  }
+
+  return standardRespectPerSecond;
+}
 
 export function createPlayerState(): PlayerState {
   return {
@@ -42,17 +66,18 @@ export function reducePlayerState(
   dtMs: number,
 ): PlayerState {
   const seconds = dtMs / 1_000;
-  const pace = frame.chaos * 20 * seconds;
-  const breakdownPressure = frame.section === 'breakdown' ? 12 : 0;
-  const braceMitigation = input.action === 'brace' ? 6 : 0;
-  const actionPressure = input.action === 'two-step' ? 4 : input.action === 'shove' ? 2 : input.action === 'lift' ? 1.5 : 0;
-  const balanceLoss = Math.max(1, pace + breakdownPressure + actionPressure - braceMitigation);
-  const respectDelta = input.action === 'two-step' && frame.actionWeights.twoStep > 0.8 ? 6 : input.action === 'lift' ? 8 : 1;
+  const chaosPressure = frame.chaos * 20 * seconds;
+  const breakdownPressure = frame.section === 'breakdown' ? 48 * seconds : 0;
+  const braceMitigation = input.action === 'brace' ? braceMitigationPerSecond * seconds : 0;
+  const actionPressure = (actionPressurePerSecond[input.action] ?? 0) * seconds;
+  const slipBonus = input.action === 'slip' && frame.section === 'side-to-side prep' ? slipBonusPerSecond * seconds : 0;
+  const balanceLoss = Math.max(0, chaosPressure + breakdownPressure + actionPressure - braceMitigation - slipBonus);
+  const respectDelta = getRespectRate(input.action, frame) * seconds;
   const balance = Math.max(0, state.balance - balanceLoss);
 
   return {
     zone: input.targetZone,
-    stamina: Math.max(0, state.stamina - actionStaminaLoss[input.action]),
+    stamina: Math.max(0, state.stamina - actionStaminaLossPerSecond[input.action] * seconds),
     balance,
     respect: state.respect + respectDelta,
     status: balance === 0 ? 'down' : 'upright',
