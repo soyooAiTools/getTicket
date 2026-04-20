@@ -6,7 +6,12 @@ vi.mock('phaser', () => ({
   },
 }));
 
-import { resolvePitInput } from './pit-scene';
+import { authoredSongProfile } from '../fixtures/authored-song-profile';
+import { createCrowdState } from '../domain/crowd-state';
+import { createPlayerState } from '../domain/player-state';
+import { deriveSessionFeedback } from '../domain/session-feedback';
+import { createShowFrame } from '../domain/show-director';
+import { buildPitZoneVisuals, resolvePitInput } from './pit-scene';
 
 describe('pit scene controls', () => {
   it('keeps an action active while its key remains held', () => {
@@ -71,5 +76,30 @@ describe('pit scene controls', () => {
       action: 'brace',
       targetZone: 'side',
     });
+  });
+
+  it('builds a readable zone layout with mirrored side lanes and highlighted target states', () => {
+    const frame = createShowFrame(authoredSongProfile, 61_000);
+    const feedback = deriveSessionFeedback({
+      frame,
+      crowd: createCrowdState(frame),
+      player: createPlayerState(),
+      currentMission: 'center-hold',
+      failed: false,
+    });
+
+    const visuals = buildPitZoneVisuals(feedback);
+
+    expect(visuals.map((visual) => visual.id)).toEqual([
+      'front',
+      'side-left',
+      'center',
+      'side-right',
+      'edge',
+    ]);
+    expect(visuals[0].label).toBe('FRONT');
+    expect(visuals[2].isRecommendedZone).toBe(true);
+    expect(visuals[1].zone).toBe('side');
+    expect(visuals[3].zone).toBe('side');
   });
 });

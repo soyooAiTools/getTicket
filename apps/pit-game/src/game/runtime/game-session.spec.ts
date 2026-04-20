@@ -14,6 +14,7 @@ describe('game session', () => {
     expect(session.elapsedMs).toBe(63_000);
     expect(session.currentMission).toBe('center-hold');
     expect(session.failed).toBe(true);
+    expect(session.feedback.danger.state).toBe('removed');
   });
 
   it('seeds crowd state from the starting frame when created mid-song', () => {
@@ -22,6 +23,7 @@ describe('game session', () => {
     expect(session.crowd.center.flow).toBe('collapse');
     expect(session.crowd.center.density).toBe(0.88);
     expect(session.crowd.edge.density).toBe(0.48);
+    expect(session.feedback.section.label).toBe('Breakdown');
   });
 
   it('splits a step across a section boundary consistently', () => {

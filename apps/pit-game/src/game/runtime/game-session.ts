@@ -1,5 +1,6 @@
 import { advanceCrowdState, createCrowdState, type CrowdState } from '../domain/crowd-state';
 import { createPlayerState, reducePlayerState, type PlayerInput, type PlayerState } from '../domain/player-state';
+import { deriveSessionFeedback, type SessionFeedback, type SessionMission } from '../domain/session-feedback';
 import { createShowFrame, type ShowFrame } from '../domain/show-director';
 import { findSectionAtMs, type SongProfile } from '../domain/song-profile';
 
@@ -9,21 +10,33 @@ export interface GameSession {
   frame: ShowFrame;
   crowd: CrowdState;
   player: PlayerState;
-  currentMission: 'survive-window' | 'center-hold' | 'help-fallen' | 'cross-line';
+  currentMission: SessionMission;
   failed: boolean;
+  feedback: SessionFeedback;
 }
 
 export function createGameSession(profile: SongProfile, elapsedMs = 0): GameSession {
   const frame = createShowFrame(profile, elapsedMs);
+  const crowd = createCrowdState(frame);
+  const player = createPlayerState();
+  const currentMission = frame.missionPool[0];
+  const failed = false;
 
   return {
     profile,
     elapsedMs,
     frame,
-    crowd: createCrowdState(frame),
-    player: createPlayerState(),
-    currentMission: frame.missionPool[0],
-    failed: false,
+    crowd,
+    player,
+    currentMission,
+    failed,
+    feedback: deriveSessionFeedback({
+      frame,
+      crowd,
+      player,
+      currentMission,
+      failed,
+    }),
   };
 }
 
@@ -33,6 +46,8 @@ function stepGameSessionSlice(session: GameSession, input: PlayerInput, dtMs: nu
   const frame = createShowFrame(session.profile, elapsedMs);
   const crowd = advanceCrowdState(session.crowd, inputFrame, dtMs);
   const player = reducePlayerState(session.player, input, inputFrame, dtMs);
+  const currentMission = frame.missionPool[0];
+  const failed = session.failed || player.status === 'down';
 
   return {
     ...session,
@@ -40,8 +55,15 @@ function stepGameSessionSlice(session: GameSession, input: PlayerInput, dtMs: nu
     frame,
     crowd,
     player,
-    currentMission: frame.missionPool[0],
-    failed: session.failed || player.status === 'down',
+    currentMission,
+    failed,
+    feedback: deriveSessionFeedback({
+      frame,
+      crowd,
+      player,
+      currentMission,
+      failed,
+    }),
   };
 }
 
