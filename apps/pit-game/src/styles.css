@@ -31,6 +31,17 @@ body {
   backdrop-filter: blur(8px);
 }
 
+.review-row {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.control-column {
+  display: grid;
+  gap: 20px;
+}
+
 .stage-panel {
   display: grid;
   gap: 16px;
@@ -53,4 +64,10 @@ body {
 
 .hud {
   align-self: start;
+}
+
+button,
+select,
+input {
+  font: inherit;
 }

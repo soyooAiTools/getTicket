@@ -1,10 +1,14 @@
 import { startTransition, useEffect, useRef, useState } from 'react';
 
 import { GameHud } from './components/GameHud';
+import { ReviewPanel } from './components/ReviewPanel';
 import { UploadPanel } from './components/UploadPanel';
 import { authoredSongProfile } from './game/fixtures/authored-song-profile';
 import type { GameSession } from './game/runtime/game-session';
+import { createReviewSession, type ReviewSession } from './game/review/review-session';
 import { createRuntimeController } from './game/runtime/runtime-controller';
+
+type AppMode = 'authored' | 'reviewing' | 'uploaded';
 
 export function App() {
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -18,6 +22,8 @@ export function App() {
 
   const controller = controllerRef.current;
   const [session, setSession] = useState(() => controller.getSnapshot());
+  const [mode, setMode] = useState<AppMode>('authored');
+  const [reviewSession, setReviewSession] = useState<ReviewSession | null>(null);
 
   useEffect(() => {
     latestSessionRef.current = controller.getSnapshot();
@@ -80,14 +86,23 @@ export function App() {
 
   return (
     <main className='runtime-shell'>
-      <div>
+      <div className='control-column'>
         <UploadPanel
           onDraftReady={(draftProfile) => {
-            controller.reset(draftProfile);
+            setReviewSession(createReviewSession(draftProfile));
+            setMode('reviewing');
+          }}
+        />
+        <ReviewPanel
+          session={mode === 'reviewing' ? reviewSession : null}
+          onChange={setReviewSession}
+          onPlay={(profile) => {
+            controller.reset(profile);
             latestSessionRef.current = controller.getSnapshot();
             startTransition(() => {
               setSession(controller.getSnapshot());
             });
+            setMode('uploaded');
           }}
         />
         <section className='panel stage-panel'>
