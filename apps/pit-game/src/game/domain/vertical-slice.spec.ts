@@ -3,6 +3,21 @@ import { describe, expect, it } from 'vitest';
 import { minorityThreatVerticalSlice } from '../fixtures/minority-threat-vertical-slice';
 import { validateVerticalSliceFixture } from './vertical-slice';
 
+function cloneVerticalSliceFixture() {
+  return {
+    ...minorityThreatVerticalSlice,
+    audio: { ...minorityThreatVerticalSlice.audio },
+    profile: {
+      ...minorityThreatVerticalSlice.profile,
+      beatGridMs: [...minorityThreatVerticalSlice.profile.beatGridMs],
+      sections: minorityThreatVerticalSlice.profile.sections.map((section) => ({ ...section })),
+      impacts: minorityThreatVerticalSlice.profile.impacts.map((impact) => ({ ...impact })),
+    },
+    phases: minorityThreatVerticalSlice.phases.map((phase) => ({ ...phase })),
+    events: minorityThreatVerticalSlice.events.map((event) => ({ ...event })),
+  };
+}
+
 describe('minorityThreatVerticalSlice', () => {
   it('defines a single valid 30-second authored slice for Minority Threat', () => {
     expect(minorityThreatVerticalSlice.audio.fileName).toBe('Minority Unit - Minority Threat.mp3');
@@ -18,5 +33,40 @@ describe('minorityThreatVerticalSlice', () => {
       'aftershock',
     ]);
     expect(validateVerticalSliceFixture(minorityThreatVerticalSlice)).toEqual([]);
+  });
+
+  it('rejects a phase gap', () => {
+    const fixture = cloneVerticalSliceFixture();
+    fixture.phases[1] = { ...fixture.phases[1]!, startMs: 6_500 };
+
+    expect(validateVerticalSliceFixture(fixture)).toContain('phase 1 must start when phase 0 ends');
+  });
+
+  it('rejects a phase range that starts before zero', () => {
+    const fixture = cloneVerticalSliceFixture();
+    fixture.phases[0] = { ...fixture.phases[0]!, startMs: -100 };
+
+    expect(validateVerticalSliceFixture(fixture)).toContain('phase 0 starts outside the slice duration');
+  });
+
+  it('rejects a segment/profile duration mismatch', () => {
+    const fixture = cloneVerticalSliceFixture();
+    fixture.profile.durationMs = 29_000;
+
+    expect(validateVerticalSliceFixture(fixture)).toContain('audio segment duration must match the slice duration');
+  });
+
+  it('rejects an event timestamp outside the slice duration', () => {
+    const fixture = cloneVerticalSliceFixture();
+    fixture.events[4] = { ...fixture.events[4]!, atMs: 30_000 };
+
+    expect(validateVerticalSliceFixture(fixture)).toContain('event 4 occurs outside the slice duration');
+  });
+
+  it('rejects an invalid embedded song profile', () => {
+    const fixture = cloneVerticalSliceFixture();
+    fixture.profile.sections[0] = { ...fixture.profile.sections[0]!, startMs: 500 };
+
+    expect(validateVerticalSliceFixture(fixture)).toContain('profile: first section must start at 0');
   });
 });

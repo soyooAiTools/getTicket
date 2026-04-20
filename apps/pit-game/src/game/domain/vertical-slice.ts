@@ -1,4 +1,4 @@
-import type { ImpactMarker, SongProfile } from './song-profile';
+import { validateSongProfile, type ImpactMarker, type SongProfile } from './song-profile';
 
 export type VerticalSlicePhaseKind = 'tension-in' | 'breakdown-peak' | 'aftershock';
 export type VerticalSliceEventKind = 'crowd-build' | 'lateral-surge' | 'breakdown-hit' | 'aftershock-drop';
@@ -43,6 +43,7 @@ export function createSliceImpact(kind: VerticalSliceEventKind, atMs: number): I
 
 export function validateVerticalSliceFixture(fixture: VerticalSliceFixture): string[] {
   const errors: string[] = [];
+  const durationMs = fixture.profile.durationMs;
 
   if (fixture.phases.length === 0) {
     errors.push('slice has no phases');
@@ -63,6 +64,14 @@ export function validateVerticalSliceFixture(fixture: VerticalSliceFixture): str
         continue;
       }
 
+      if (current.startMs < 0 || current.startMs > durationMs) {
+        errors.push(`phase ${index} starts outside the slice duration`);
+      }
+
+      if (current.endMs < 0 || current.endMs > durationMs) {
+        errors.push(`phase ${index} ends outside the slice duration`);
+      }
+
       if (current.startMs >= current.endMs) {
         errors.push(`phase ${index} has a non-positive range`);
       }
@@ -73,13 +82,27 @@ export function validateVerticalSliceFixture(fixture: VerticalSliceFixture): str
     }
   }
 
-  if (fixture.audio.segmentEndMs - fixture.audio.segmentStartMs !== fixture.profile.durationMs) {
+  for (let index = 0; index < fixture.events.length; index += 1) {
+    const event = fixture.events[index];
+
+    if (!event) {
+      continue;
+    }
+
+    if (event.atMs < 0 || event.atMs >= durationMs) {
+      errors.push(`event ${index} occurs outside the slice duration`);
+    }
+  }
+
+  if (fixture.audio.segmentEndMs - fixture.audio.segmentStartMs !== durationMs) {
     errors.push('audio segment duration must match the slice duration');
   }
 
   if (fixture.events.length === 0) {
     errors.push('slice must contain authored events');
   }
+
+  errors.push(...validateSongProfile(fixture.profile).map((error) => `profile: ${error}`));
 
   return errors;
 }
