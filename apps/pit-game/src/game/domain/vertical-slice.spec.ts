@@ -24,6 +24,8 @@ describe('minorityThreatVerticalSlice', () => {
     expect(minorityThreatVerticalSlice.audio.localPath).toBe(
       'C:/Users/Nick/Desktop/Minority Unit - Minority Threat.mp3',
     );
+    expect(minorityThreatVerticalSlice.audio.segmentStartMs).toBe(46_000);
+    expect(minorityThreatVerticalSlice.audio.segmentEndMs).toBe(76_000);
     expect(
       minorityThreatVerticalSlice.audio.segmentEndMs - minorityThreatVerticalSlice.audio.segmentStartMs,
     ).toBe(30_000);
