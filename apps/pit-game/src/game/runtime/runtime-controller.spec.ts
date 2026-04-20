@@ -41,6 +41,14 @@ describe('runtime controller', () => {
     expect(controller.getSnapshot().elapsedMs).toBe(0);
   });
 
+  it('resets the runtime at a preview offset', () => {
+    const controller = createRuntimeController(authoredSongProfile);
+
+    controller.reset(authoredSongProfile, 7_250);
+
+    expect(controller.getSnapshot().elapsedMs).toBe(7_250);
+  });
+
   it('publishes a result when the run ends and stops stepping afterward', () => {
     const controller = createRuntimeController(authoredSongProfile, authoredSongProfile.durationMs - 1_000);
 

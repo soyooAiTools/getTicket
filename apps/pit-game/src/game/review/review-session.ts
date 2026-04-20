@@ -10,6 +10,7 @@ import type {
   ReviewedProfileDraft,
   ReviewedProfileReviewState,
 } from '../persistence/song-profile-storage';
+import { buildPreviewWindow, type PreviewWindow } from './preview-window';
 
 export type ReviewState = 'suggested' | 'accepted' | 'modified' | 'user-added';
 
@@ -39,7 +40,7 @@ export interface ReviewSession {
     | { kind: 'section'; index: number }
     | { kind: 'impact'; index: number }
     | null;
-  loopRange: { startMs: number; endMs: number } | null;
+  loopRange: PreviewWindow | null;
   audioSource: { name: string; objectUrl: string } | null;
 }
 
@@ -401,6 +402,40 @@ export function acceptSectionReview(session: ReviewSession, index: number): Revi
     ...session.overlay,
     sections,
   });
+}
+
+export function selectSection(session: ReviewSession, index: number): ReviewSession {
+  const section = session.overlay.sections[index];
+
+  if (!section) {
+    return session;
+  }
+
+  return {
+    ...session,
+    selection: { kind: 'section', index },
+    loopRange: buildPreviewWindow(session.draft.profile, {
+      startMs: section.startMs,
+      endMs: section.endMs,
+    }),
+  };
+}
+
+export function selectImpact(session: ReviewSession, index: number): ReviewSession {
+  const impact = session.overlay.impacts[index];
+
+  if (!impact) {
+    return session;
+  }
+
+  return {
+    ...session,
+    selection: { kind: 'impact', index },
+    loopRange: buildPreviewWindow(session.draft.profile, {
+      startMs: Math.max(0, impact.atMs - 1_500),
+      endMs: Math.min(session.draft.profile.durationMs, impact.atMs + 1_500),
+    }),
+  };
 }
 
 export function buildPlayableProfile(session: ReviewSession): SongProfile {

@@ -9,6 +9,8 @@ import {
   getAuthoringWarnings,
   mergeSectionForward,
   moveSectionBoundary,
+  selectImpact,
+  selectSection,
   splitSectionAtBeat,
 } from './review-session';
 
@@ -103,5 +105,27 @@ describe('review session authoring', () => {
     expect(endClamped.overlay.sections[1]).toMatchObject({ startMs: 8_000, endMs: 12_000 });
     expect(startClamped.overlay.sections[1]).toMatchObject({ startMs: 8_000, endMs: 12_000 });
     expect(startClamped.overlay.sections[0]).toMatchObject({ startMs: 0, endMs: 8_000 });
+  });
+
+  it('selects a section and builds a deterministic preview loop range', () => {
+    const session = selectSection(createReviewSession(draft), 1);
+
+    expect(session.selection).toEqual({ kind: 'section', index: 1 });
+    expect(session.loopRange).toEqual({
+      startMs: 4_125,
+      endMs: 12_000,
+      seed: '4125:12000',
+    });
+  });
+
+  it('selects an impact and builds a deterministic preview loop range', () => {
+    const session = selectImpact(createReviewSession(draft), 0);
+
+    expect(session.selection).toEqual({ kind: 'impact', index: 0 });
+    expect(session.loopRange).toEqual({
+      startMs: 3_750,
+      endMs: 9_375,
+      seed: '3750:9375',
+    });
   });
 });

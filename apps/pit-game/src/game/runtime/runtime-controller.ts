@@ -6,7 +6,7 @@ export interface RuntimeController {
   subscribe(listener: (session: GameSession) => void): () => void;
   getSnapshot(): GameSession;
   step(input: PlayerInput, dtMs: number): void;
-  reset(profile: SongProfile): void;
+  reset(profile: SongProfile, elapsedMs?: number): void;
 }
 
 function getLastPlayableMs(profile: SongProfile): number {
@@ -45,8 +45,8 @@ export function createRuntimeController(profile: SongProfile, elapsedMs = 0): Ru
       snapshot = stepGameSession(snapshot, input, safeDtMs);
       publish();
     },
-    reset(nextProfile) {
-      snapshot = createGameSession(nextProfile);
+    reset(nextProfile, nextElapsedMs = 0) {
+      snapshot = createGameSession(nextProfile, nextElapsedMs);
       publish();
     },
   };
