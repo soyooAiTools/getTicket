@@ -1,5 +1,6 @@
 import { startTransition, useEffect, useRef, useState } from 'react';
 
+import { ResultsPanel } from './components/ResultsPanel';
 import { GameHud } from './components/GameHud';
 import { ReviewPanel } from './components/ReviewPanel';
 import { UploadPanel } from './components/UploadPanel';
@@ -85,12 +86,23 @@ export function App() {
   }, [controller]);
 
   return (
-    <main className='runtime-shell'>
+    <main className={`runtime-shell${session.result ? ' has-result' : ''}`}>
       <div className='control-column'>
         <UploadPanel
           onDraftReady={(draftProfile) => {
             setReviewSession(createReviewSession(draftProfile));
             setMode('reviewing');
+          }}
+        />
+        <ResultsPanel
+          profileTitle={session.profile.title}
+          result={session.result}
+          onRestart={() => {
+            controller.reset(session.profile);
+            latestSessionRef.current = controller.getSnapshot();
+            startTransition(() => {
+              setSession(controller.getSnapshot());
+            });
           }}
         />
         <ReviewPanel

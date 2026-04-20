@@ -30,6 +30,10 @@ export function createRuntimeController(profile: SongProfile, elapsedMs = 0): Ru
       return snapshot;
     },
     step(input, dtMs) {
+      if (snapshot.result) {
+        return;
+      }
+
       const lastPlayableMs = getLastPlayableMs(snapshot.profile);
       const remainingMs = lastPlayableMs - snapshot.elapsedMs;
       const safeDtMs = Math.min(dtMs, remainingMs);

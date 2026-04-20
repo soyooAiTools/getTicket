@@ -33,6 +33,10 @@ body {
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
 }
 
+.runtime-shell.has-result .stage-panel {
+  border-color: rgba(243, 195, 131, 0.34);
+}
+
 .review-row {
   display: grid;
   gap: 8px;
@@ -42,6 +46,85 @@ body {
 .review-actions {
   display: grid;
   gap: 8px;
+}
+
+.results-panel {
+  display: grid;
+  gap: 16px;
+  border-color: rgba(243, 195, 131, 0.24);
+  background:
+    radial-gradient(circle at top right, rgba(243, 195, 131, 0.12), transparent 34%),
+    rgba(16, 10, 8, 0.82);
+}
+
+.results-header {
+  display: grid;
+  gap: 6px;
+}
+
+.results-eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.72rem;
+  color: #f2d39a;
+}
+
+.results-label {
+  font-size: 1.1rem;
+  color: #fff1d0;
+}
+
+.results-summary {
+  margin: 0;
+  color: #d9c7b6;
+  line-height: 1.45;
+}
+
+.results-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.results-axis {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(10, 7, 7, 0.6);
+}
+
+.results-axis strong {
+  font-size: 1.12rem;
+  color: #fff1d0;
+}
+
+.results-axis p,
+.results-axis small {
+  margin: 0;
+  color: #d4c1b0;
+  line-height: 1.45;
+}
+
+.results-axis-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #f2d39a;
+}
+
+.results-footer {
+  display: grid;
+  gap: 12px;
+}
+
+.results-status {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.74rem;
+  color: #f2d39a;
 }
 
 .control-column {

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { authoredSongProfile } from '../fixtures/authored-song-profile';
+import { findSectionAtMs } from '../domain/song-profile';
+import type { PlayerInput } from '../domain/player-state';
 import { createGameSession, stepGameSession } from './game-session';
 
 describe('game session', () => {
@@ -11,10 +13,12 @@ describe('game session', () => {
       session = stepGameSession(session, { action: 'two-step', targetZone: 'center' }, 250);
     }
 
-    expect(session.elapsedMs).toBe(63_000);
+    expect(session.elapsedMs).toBe(62_250);
     expect(session.currentMission).toBe('center-hold');
     expect(session.failed).toBe(true);
     expect(session.feedback.danger.state).toBe('removed');
+    expect(session.result?.failed).toBe(true);
+    expect(session.completed).toBe(false);
   });
 
   it('seeds crowd state from the starting frame when created mid-song', () => {
@@ -40,5 +44,34 @@ describe('game session', () => {
     expect(combined.currentMission).toBe(split.currentMission);
     expect(combined.player.balance).toBeCloseTo(split.player.balance, 6);
     expect(combined.crowd.fallenFans).toBeCloseTo(split.crowd.fallenFans, 6);
+  });
+
+  it('produces a completed result when the song reaches the end cleanly', () => {
+    let session = createGameSession(authoredSongProfile, 92_000);
+
+    while (!session.result) {
+      const section = findSectionAtMs(authoredSongProfile, session.elapsedMs);
+      if (!section) {
+        break;
+      }
+
+      const input: PlayerInput =
+        section.kind === 'gather' || section.kind === 'push'
+          ? { action: 'idle', targetZone: 'edge' }
+          : section.kind === 'two-step'
+            ? { action: 'two-step', targetZone: 'center' as const }
+            : section.kind === 'side-to-side prep'
+              ? { action: 'slip', targetZone: 'side' as const }
+              : section.kind === 'breakdown'
+                ? { action: 'brace', targetZone: 'center' }
+                : { action: 'lift', targetZone: 'edge' };
+
+      session = stepGameSession(session, input, 500);
+    }
+
+    expect(session.completed).toBe(true);
+    expect(session.result?.completed).toBe(true);
+    expect(session.result?.label).not.toBe('Crowd Meat');
+    expect(session.result?.axes.survival.score).toBeGreaterThanOrEqual(90);
   });
 });
