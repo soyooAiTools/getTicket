@@ -37,6 +37,7 @@ export function ReviewPanel({ session, onChange, onPlay }: ReviewPanelProps) {
             {section.startMs}ms - {section.endMs}ms
           </span>
           <select
+            className='form-control'
             value={session.overrides.sectionKinds[index] ?? section.kind}
             onChange={(event) =>
               onChange(applySectionOverride(session, index, event.target.value as SectionKind))
@@ -50,7 +51,11 @@ export function ReviewPanel({ session, onChange, onPlay }: ReviewPanelProps) {
           </select>
         </label>
       ))}
-      <button type='button' onClick={() => onPlay(buildPlayableProfile(session))}>
+      <button
+        type='button'
+        className='form-control'
+        onClick={() => onPlay(buildPlayableProfile(session))}
+      >
         Play Reviewed Profile
       </button>
     </section>
