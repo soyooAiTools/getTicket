@@ -42,7 +42,7 @@ describe('repo layout', () => {
     expect(rootPackage.scripts?.test).toContain('pnpm --filter load-control test:e2e');
     expect(rootPackage.scripts?.test).toContain('pnpm --filter pit-game test');
     expect(rootPackage.scripts?.test).toContain(
-      'pnpm exec vitest run tests/perf/load-testing-fixtures.spec.ts',
+      'pnpm exec vitest run --exclude=.worktrees/** tests/perf/load-testing-fixtures.spec.ts',
     );
     expect(rootPackage.scripts?.test).toContain('@ticketing/contracts');
     expect(rootPackage.scripts?.test).toContain('tests/workspace/repo-layout.spec.ts');
@@ -82,7 +82,9 @@ describe('repo layout', () => {
     });
 
     expect(readJson<{ scripts: Record<string, string> }>('apps/api/package.json').scripts).toEqual({
+      build: 'tsc -p tsconfig.build.json',
       dev: 'nest start --watch',
+      'start:prod': 'node dist/apps/api/src/main.js',
       test: 'jest',
       'test:e2e': 'jest --config test/jest-e2e.json',
       'prisma:generate': 'prisma generate',

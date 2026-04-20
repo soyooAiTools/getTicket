@@ -8,7 +8,7 @@
     "dev:admin": "corepack pnpm --filter admin dev",
     "dev:miniapp": "corepack pnpm --filter miniapp dev:weapp",
     "dev:pit-game": "corepack pnpm --filter pit-game dev",
-    "test": "corepack pnpm --filter api test && corepack pnpm --filter @ticketing/contracts test && corepack pnpm --filter load-control test && corepack pnpm --filter load-control test:e2e && corepack pnpm --filter pit-game test && corepack pnpm exec vitest run tests/perf/load-testing-fixtures.spec.ts && corepack pnpm exec vitest run tests/workspace/repo-layout.spec.ts",
+    "test": "corepack pnpm --filter api test && corepack pnpm --filter @ticketing/contracts test && corepack pnpm --filter load-control test && corepack pnpm --filter load-control test:e2e && corepack pnpm --filter pit-game test && corepack pnpm exec vitest run --exclude=.worktrees/** tests/perf/load-testing-fixtures.spec.ts && corepack pnpm exec vitest run --exclude=.worktrees/** tests/workspace/repo-layout.spec.ts",
     "lint": "corepack pnpm -r --if-present lint && corepack pnpm exec eslint tests --ext .ts"
   },
   "devDependencies": {
