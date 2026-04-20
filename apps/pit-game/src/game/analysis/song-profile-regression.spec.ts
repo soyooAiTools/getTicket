@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { buildAnalysisDraft } from './draft-song-profile';
 import { buildDraftSongProfile } from './draft-song-profile';
 
 function createBoundaryInput(frameCount: number) {
@@ -63,6 +64,41 @@ describe('song profile regression', () => {
     expect(sectionKinds.some((kind) => kind === 'push' || kind === 'two-step')).toBe(true);
     expect(sectionKinds.some((kind) => kind === 'breakdown')).toBe(true);
     expect(sectionKinds[sectionKinds.length - 1]).toBe('recovery');
+  });
+
+  it('promotes analyzer output into a separated analysis draft', () => {
+    const draft = buildAnalysisDraft({
+      title: 'Dense Barrage',
+      durationMs: 48_000,
+      bpm: 192,
+      beatGridMs: Array.from({ length: 153 }, (_, index) => Math.round(index * (60_000 / 192))),
+      energyFrames: Array.from({ length: 96 }, (_, index) => {
+        const progress = index / 95;
+
+        if (progress < 0.22) {
+          return {
+            atMs: index * 500,
+            rms: 0.18 + progress * 1.9,
+          };
+        }
+
+        if (progress < 0.74) {
+          return {
+            atMs: index * 500,
+            rms: 0.9 + ((index % 4) - 1.5) * 0.01,
+          };
+        }
+
+        return {
+          atMs: index * 500,
+          rms: 0.9 - (progress - 0.74) * 1.5,
+        };
+      }),
+      impactMoments: [12_000, 24_000, 36_000],
+    });
+
+    expect(draft.impactCandidates.map((item) => item.strength)).toEqual(['accent', 'drop', 'hit']);
+    expect(draft.warnings).toContain('low-confidence section 1');
   });
 
   it('keeps the dense-section heuristic stable around the density cutoff', () => {

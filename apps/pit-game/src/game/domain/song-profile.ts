@@ -16,8 +16,10 @@ export interface SongSection {
 
 export interface ImpactMarker {
   atMs: number;
-  strength: 'accent' | 'drop';
+  strength: ImpactStrength;
 }
+
+export type ImpactStrength = 'accent' | 'drop' | 'hit' | 'stop';
 
 export interface SongProfile {
   id: string;

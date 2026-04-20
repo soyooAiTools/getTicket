@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildDraftSongProfile, buildValidatedDraftSongProfile } from './draft-song-profile';
+import { buildAnalysisDraft, buildDraftSongProfile, buildValidatedDraftSongProfile } from './draft-song-profile';
 
 describe('draft song profile', () => {
   it('turns a high-energy drop into a breakdown section with a drop marker', () => {
@@ -22,6 +22,26 @@ describe('draft song profile', () => {
 
     expect(profile.sections.some((section) => section.kind === 'breakdown')).toBe(true);
     expect(profile.impacts.some((impact) => impact.strength === 'drop')).toBe(true);
+  });
+
+  it('emits heavy-song impact candidates without mutating the playable profile', () => {
+    const draft = buildAnalysisDraft({
+      title: 'Break Test',
+      durationMs: 16_000,
+      bpm: 160,
+      beatGridMs: [0, 375, 750, 1_125, 1_500],
+      energyFrames: [
+        { atMs: 0, rms: 0.18 },
+        { atMs: 4_000, rms: 0.62 },
+        { atMs: 8_000, rms: 0.91 },
+        { atMs: 12_000, rms: 0.11 },
+      ],
+      impactMoments: [7_500, 8_000, 8_375],
+    });
+
+    expect(draft.sectionSuggestions.some((item) => item.reasons.includes('peak energy bucket'))).toBe(true);
+    expect(draft.impactCandidates.map((item) => item.strength)).toContain('hit');
+    expect(draft.profile.impacts.every((item) => item.strength === 'accent' || item.strength === 'drop')).toBe(true);
   });
 
   it('rejects analysis input that produces an invalid song profile', () => {

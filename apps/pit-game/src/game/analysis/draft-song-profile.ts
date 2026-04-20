@@ -1,3 +1,4 @@
+import { createAnalysisDraft, type AnalysisDraft } from '../domain/analysis-draft';
 import { validateSongProfile, type SongProfile, type SongSection } from '../domain/song-profile';
 
 export interface AnalysisInput {
@@ -103,6 +104,40 @@ export function buildDraftSongProfile(input: AnalysisInput): SongProfile {
       strength: index === input.impactMoments.length - 1 ? 'drop' : 'accent',
     })),
   };
+}
+
+export function buildAnalysisDraft(input: AnalysisInput): AnalysisDraft {
+  const profile = buildDraftSongProfile(input);
+
+  return createAnalysisDraft({
+    id: profile.id,
+    sourceTitle: input.title,
+    profile,
+    sectionSuggestions: profile.sections.map((section, index) => ({
+      index,
+      confidence: section.confidence,
+      reasons: section.chaos > 0.8 ? ['peak energy bucket'] : ['coarse energy bucket'],
+    })),
+    impactCandidates: input.impactMoments.map((atMs, index, all) => {
+      const isLast = index === all.length - 1;
+      const isPenultimate = all.length >= 3 && index === all.length - 2;
+
+      return {
+        atMs,
+        strength: isLast ? 'hit' : isPenultimate ? 'drop' : 'accent',
+        confidence: isLast ? 0.81 : isPenultimate ? 0.69 : 0.62,
+        reasons: isLast
+          ? ['terminal transient cluster']
+          : isPenultimate
+            ? ['trailing impact valley']
+            : ['energy spike'],
+      };
+    }),
+    warnings: profile.sections
+      .map((section, index) => ({ section, index }))
+      .filter(({ section }) => section.confidence < 0.7)
+      .map(({ index }) => `low-confidence section ${index}`),
+  });
 }
 
 export function buildValidatedDraftSongProfile(input: AnalysisInput): SongProfile {
