@@ -7,7 +7,11 @@ import { ReviewPanel } from './components/ReviewPanel';
 import { UploadPanel } from './components/UploadPanel';
 import { authoredSongProfile } from './game/fixtures/authored-song-profile';
 import { sampleProfileLibrary } from './game/fixtures/profile-library';
-import { saveReviewedProfile } from './game/persistence/song-profile-storage';
+import {
+  hydrateSavedAuthoringProject,
+  saveReviewedProfile,
+  type SavedAuthoringProjectRecord,
+} from './game/persistence/song-profile-storage';
 import type { SongProfile } from './game/domain/song-profile';
 import type { GameSession } from './game/runtime/game-session';
 import { createReviewSession, type ReviewSession } from './game/review/review-session';
@@ -20,6 +24,9 @@ export function App() {
   const controllerRef = useRef<ReturnType<typeof createRuntimeController> | null>(null);
   const latestSessionRef = useRef<GameSession | null>(null);
   const flushTimeoutRef = useRef<number | null>(null);
+  const relinkInputRef = useRef<HTMLInputElement | null>(null);
+  const pendingRelinkRecordRef = useRef<SavedAuthoringProjectRecord | null>(null);
+  const ownedAudioUrlRef = useRef<string | null>(null);
 
   if (!controllerRef.current) {
     controllerRef.current = createRuntimeController(authoredSongProfile);
@@ -78,6 +85,15 @@ export function App() {
   }, [controller]);
 
   useEffect(() => {
+    return () => {
+      if (ownedAudioUrlRef.current) {
+        URL.revokeObjectURL(ownedAudioUrlRef.current);
+        ownedAudioUrlRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (!mountRef.current) {
       return;
     }
@@ -108,6 +124,41 @@ export function App() {
             setReviewSession(createReviewSession(draftProfile));
             setReviewSaveMessage(null);
             setMode('reviewing');
+          }}
+        />
+        <input
+          ref={relinkInputRef}
+          type='file'
+          accept='.mp3,.wav,.ogg'
+          hidden
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            const record = pendingRelinkRecordRef.current;
+            const input = event.currentTarget;
+
+            if (!file || !record) {
+              input.value = '';
+              return;
+            }
+
+            if (ownedAudioUrlRef.current) {
+              URL.revokeObjectURL(ownedAudioUrlRef.current);
+            }
+
+            const objectUrl = URL.createObjectURL(file);
+            ownedAudioUrlRef.current = objectUrl;
+            pendingRelinkRecordRef.current = null;
+
+            applyRuntimeProfile(record.profile);
+            setReviewSession(
+              hydrateSavedAuthoringProject(record, {
+                name: file.name,
+                objectUrl,
+              }),
+            );
+            setReviewSaveMessage(`Relinked audio for ${record.name}.`);
+            setMode('reviewing');
+            input.value = '';
           }}
         />
         <section className='panel profile-library'>
@@ -177,11 +228,19 @@ export function App() {
         />
         <ProfileLibrary
           revision={libraryRevision}
-          onLoad={(profile) => {
-            applyRuntimeProfile(profile.profile);
-            setReviewSession(createReviewSession(profile.profile, profile.name, profile.review));
-            setReviewSaveMessage(`Loaded ${profile.name} from local storage.`);
+          onLoad={(record) => {
+            applyRuntimeProfile(record.profile);
+            setReviewSession(hydrateSavedAuthoringProject(record));
+            setReviewSaveMessage(
+              record.requiresAudioRelink
+                ? `Loaded ${record.name} from local storage. Relink the original song file to restore local preview audio.`
+                : `Loaded ${record.name} from local storage.`,
+            );
             setMode('reviewing');
+          }}
+          onRelink={(record) => {
+            pendingRelinkRecordRef.current = record;
+            relinkInputRef.current?.click();
           }}
         />
         <section className='panel stage-panel'>

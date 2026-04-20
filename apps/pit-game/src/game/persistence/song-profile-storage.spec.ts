@@ -102,6 +102,37 @@ describe('saved authoring projects', () => {
     expect(loadSavedAuthoringProjects(storage)[0]?.draft.sourceTitle).toBe('Legacy');
   });
 
+  it('writes migrated legacy v1 records through into v2 storage on first load', () => {
+    const storage = createMemoryStorage();
+
+    storage.setItem(
+      'pit-game.reviewed-profiles.v1',
+      JSON.stringify([
+        {
+          id: 'legacy',
+          name: 'Legacy',
+          sourceTitle: 'Legacy',
+          savedAt: '2026-04-20T00:00:00.000Z',
+          profile: draftFixture.profile,
+          review: { sectionKinds: {}, sectionChaos: {}, reviewedSections: {} },
+        },
+      ]),
+    );
+
+    const loaded = loadSavedAuthoringProjects(storage);
+    const migratedRaw = storage.getItem('pit-game.authoring-projects.v2');
+
+    expect(loaded).toHaveLength(1);
+    expect(migratedRaw).not.toBeNull();
+    expect(JSON.parse(migratedRaw ?? '[]')).toEqual([
+      expect.objectContaining({
+        id: 'legacy',
+        sourceTitle: 'Legacy',
+        requiresAudioRelink: true,
+      }),
+    ]);
+  });
+
   it('keeps the reviewed-profile compatibility facade working through v2 storage', () => {
     const storage = createMemoryStorage();
 

@@ -523,7 +523,17 @@ function readSavedAuthoringProjects(storage: StorageLike | null): SavedAuthoring
     return null;
   }
 
-  return legacy.map(migrateLegacyRecord);
+  const migrated = legacy.map(migrateLegacyRecord);
+
+  if (migrated.length === 0) {
+    return migrated;
+  }
+
+  if (!writeSavedAuthoringProjects(storage, migrated)) {
+    return null;
+  }
+
+  return migrated;
 }
 
 export function loadSavedAuthoringProjects(storage?: StorageLike | null): SavedAuthoringProjectRecord[] {
