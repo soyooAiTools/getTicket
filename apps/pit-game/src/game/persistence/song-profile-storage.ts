@@ -80,6 +80,10 @@ function clampChaos(value: number): number {
   return Math.max(0, Math.min(1, Number(value.toFixed(2))));
 }
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
 function normalizeReviewState(value: unknown): ReviewedProfileReviewState | null {
   if (!isRecordLike(value)) {
     return null;
@@ -135,11 +139,46 @@ function normalizeProfile(value: unknown): SongProfile | null {
   }
 
   const profile = value as Partial<SongProfile>;
-  if (!Array.isArray(profile.sections)) {
+  if (
+    typeof profile.id !== 'string' ||
+    typeof profile.title !== 'string' ||
+    !isFiniteNumber(profile.durationMs) ||
+    profile.durationMs <= 0 ||
+    !isFiniteNumber(profile.bpm) ||
+    profile.bpm <= 0 ||
+    !Array.isArray(profile.sections) ||
+    !Array.isArray(profile.beatGridMs) ||
+    !Array.isArray(profile.impacts)
+  ) {
     return null;
   }
 
-  if (!profile.sections.every((section) => isRecordLike(section) && isValidSectionKind(section.kind))) {
+  if (
+    !profile.sections.every(
+      (section) =>
+        isRecordLike(section) &&
+        isValidSectionKind(section.kind) &&
+        isFiniteNumber(section.startMs) &&
+        isFiniteNumber(section.endMs) &&
+        isFiniteNumber(section.confidence) &&
+        isFiniteNumber(section.chaos),
+    )
+  ) {
+    return null;
+  }
+
+  if (!profile.beatGridMs.every((beatMs) => isFiniteNumber(beatMs))) {
+    return null;
+  }
+
+  if (
+    !profile.impacts.every(
+      (impact) =>
+        isRecordLike(impact) &&
+        isFiniteNumber(impact.atMs) &&
+        (impact.strength === 'accent' || impact.strength === 'drop'),
+    )
+  ) {
     return null;
   }
 

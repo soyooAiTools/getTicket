@@ -129,6 +129,35 @@ describe('song profile storage', () => {
     expect(loadReviewedProfiles(storage)).toEqual([]);
   });
 
+  it('drops saved records whose profile timing fields are malformed', () => {
+    const storage = createMemoryStorage();
+    storage.setItem(
+      'pit-game.reviewed-profiles.v1',
+      JSON.stringify([
+        {
+          id: 'saved-1',
+          name: 'Weekend Chain',
+          sourceTitle: authoredSongProfile.title,
+          savedAt: '2026-04-20T00:00:00.000Z',
+          profile: {
+            ...authoredSongProfile,
+            durationMs: 'bad-duration',
+            sections: authoredSongProfile.sections.map((section, index) =>
+              index === 0 ? { ...section, startMs: 'bad-start' } : section,
+            ),
+          },
+          review: {
+            sectionKinds: {},
+            sectionChaos: {},
+            reviewedSections: {},
+          },
+        },
+      ]),
+    );
+
+    expect(loadReviewedProfiles(storage)).toEqual([]);
+  });
+
   it('returns a failure signal when storage writes are unavailable', () => {
     const storage: StorageLike = {
       getItem: () => null,

@@ -30,7 +30,10 @@ function buildCoarseFrames(input: AnalysisInput) {
     return [];
   }
 
-  const sectionMs = Math.max(minimumSectionMs, Math.ceil(input.durationMs / targetSectionCount));
+  const coarseWindowCount = Math.max(1, Math.ceil(input.durationMs / minimumSectionMs));
+  const frameDensity = sortedFrames.length / coarseWindowCount;
+  const denseSectionTargetCount = frameDensity >= 6 ? 8 : targetSectionCount;
+  const sectionMs = Math.max(minimumSectionMs, Math.ceil(input.durationMs / denseSectionTargetCount));
   const bucketCount = Math.max(1, Math.ceil(input.durationMs / sectionMs));
   const buckets = Array.from({ length: bucketCount }, () => ({ sum: 0, count: 0 }));
 
