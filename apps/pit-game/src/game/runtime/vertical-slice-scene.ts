@@ -1,10 +1,16 @@
 import Phaser from 'phaser';
 
-import { getVerticalSliceWindowKey, type VerticalSliceFrame } from '../domain/vertical-slice-director';
+import {
+  getVerticalSliceWindowKey,
+  type SliceLightCue,
+  type VerticalSliceFrame,
+} from '../domain/vertical-slice-director';
 import type { VerticalSliceController } from './vertical-slice-controller';
 import type {
   VerticalSliceAction,
+  VerticalSliceInput,
   VerticalSlicePlayerState,
+  VerticalSliceSession,
   VerticalSliceZone,
 } from './vertical-slice-session';
 
@@ -34,6 +40,23 @@ export interface PlayerPoseStyle {
   angle: number;
 }
 
+export interface SliceLightPalette {
+  venueFill: number;
+  bandFill: number;
+  barrierFill: number;
+  pitFill: number;
+  edgeFill: number;
+  panelFill: number;
+  accentText: string;
+  bodyAlpha: number;
+  crowdAlpha: number;
+}
+
+export interface SceneStepResult {
+  snapshot: VerticalSliceSession;
+  punchDetected: boolean;
+}
+
 const ZONE_BOUNDS: Record<VerticalSliceZone, { centerX: number; centerY: number; width: number; height: number }> = {
   front: { centerX: 640, centerY: 262, width: 640, height: 88 },
   center: { centerX: 640, centerY: 438, width: 500, height: 220 },
@@ -47,6 +70,8 @@ const ZONE_TINTS: Record<VerticalSliceZone, number> = {
   edge: 0x6d4634,
   side: 0x86513d,
 };
+
+const MAX_SCENE_STEP_MS = 100;
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.max(minimum, Math.min(maximum, value));
@@ -117,11 +142,14 @@ function createZoneBodyVisuals(zone: VerticalSliceZone, count: number, pressure:
   for (let index = 0; index < count; index += 1) {
     const row = Math.floor(index / columns);
     const column = index % columns;
-    const centeredX = bounds.centerX - bounds.width / 2 + stepX * (column + 1);
+    const centeredX =
+      zone === 'side'
+        ? (column % 2 === 0 ? 274 : 1_006) + (row % 2 === 0 ? -18 : 18)
+        : bounds.centerX - bounds.width / 2 + stepX * (column + 1);
     const centeredY = bounds.centerY - bounds.height / 2 + stepY * (row + 1);
     const lateralOffset =
       zone === 'side'
-        ? (index % 2 === 0 ? -1 : 1) * (140 + row * 18)
+        ? (index % 2 === 0 ? -1 : 1) * (18 + row * 6)
         : (column - (columns - 1) / 2) * 6;
     const verticalOffset = ((index % 3) - 1) * 5;
 
@@ -172,6 +200,59 @@ export function resolvePlayerPoseStyle(player: Pick<VerticalSlicePlayerState, 'p
   }
 }
 
+export function resolveSliceLightPalette(lightCue: SliceLightCue): SliceLightPalette {
+  switch (lightCue) {
+    case 'room':
+      return {
+        venueFill: 0x130e0d,
+        bandFill: 0x25100f,
+        barrierFill: 0xb18a62,
+        pitFill: 0x241715,
+        edgeFill: 0x1a1211,
+        panelFill: 0x090808,
+        accentText: '#e8c894',
+        bodyAlpha: 0.92,
+        crowdAlpha: 0.84,
+      };
+    case 'tension':
+      return {
+        venueFill: 0x1c110f,
+        bandFill: 0x3d1f1a,
+        barrierFill: 0xc79e6b,
+        pitFill: 0x2d1815,
+        edgeFill: 0x201212,
+        panelFill: 0x110909,
+        accentText: '#ffce96',
+        bodyAlpha: 0.95,
+        crowdAlpha: 0.9,
+      };
+    case 'hit':
+      return {
+        venueFill: 0x24110f,
+        bandFill: 0x513128,
+        barrierFill: 0xf0c07f,
+        pitFill: 0x3a1e1a,
+        edgeFill: 0x261515,
+        panelFill: 0x170c0b,
+        accentText: '#ffe3b0',
+        bodyAlpha: 1,
+        crowdAlpha: 0.98,
+      };
+    case 'aftershock':
+      return {
+        venueFill: 0x171010,
+        bandFill: 0x2f1715,
+        barrierFill: 0xa67e63,
+        pitFill: 0x261919,
+        edgeFill: 0x1d1414,
+        panelFill: 0x0d0909,
+        accentText: '#d8b59d',
+        bodyAlpha: 0.9,
+        crowdAlpha: 0.8,
+      };
+  }
+}
+
 function resolvePlayerPosition(zone: VerticalSliceZone): { x: number; y: number } {
   switch (zone) {
     case 'front':
@@ -205,26 +286,62 @@ function formatSummary(snapshot: ReturnType<VerticalSliceController['getSnapshot
   return `${eventLabel} | Balance ${Math.round(snapshot.player.balance)} | Stamina ${Math.round(snapshot.player.stamina)}`;
 }
 
+export function stepSceneController(
+  controller: Pick<VerticalSliceController, 'step' | 'getSnapshot'>,
+  input: VerticalSliceInput,
+  delta: number,
+  maxStepMs = MAX_SCENE_STEP_MS,
+): SceneStepResult {
+  const safeDelta = Math.max(0, delta);
+  let remainingMs = safeDelta;
+  let snapshot = controller.getSnapshot();
+  let punchDetected = snapshot.frame.cameraCue === 'punch';
+
+  while (remainingMs > 0) {
+    const sliceMs = Math.min(remainingMs, maxStepMs);
+    controller.step(input, sliceMs);
+    snapshot = controller.getSnapshot();
+    punchDetected = punchDetected || snapshot.frame.cameraCue === 'punch';
+    remainingMs -= sliceMs;
+  }
+
+  return { snapshot, punchDetected };
+}
+
 export function buildVerticalSliceScene(controller: VerticalSliceController) {
   return class VerticalSliceScene extends Phaser.Scene {
     private controls!: Record<keyof SliceControlState, Phaser.Input.Keyboard.Key>;
     private crowdGraphics!: Phaser.GameObjects.Graphics;
     private player!: Phaser.GameObjects.Rectangle;
+    private venueBackdrop!: Phaser.GameObjects.Rectangle;
+    private bandArea!: Phaser.GameObjects.Rectangle;
+    private barrierLine!: Phaser.GameObjects.Rectangle;
+    private pitFloor!: Phaser.GameObjects.Rectangle;
+    private edgeLane!: Phaser.GameObjects.Rectangle;
+    private readoutPanel!: Phaser.GameObjects.Rectangle;
+    private venueReadoutLabel!: Phaser.GameObjects.Text;
+    private bandLabel!: Phaser.GameObjects.Text;
+    private barrierLabel!: Phaser.GameObjects.Text;
+    private edgeLabel!: Phaser.GameObjects.Text;
     private phaseText!: Phaser.GameObjects.Text;
     private summaryText!: Phaser.GameObjects.Text;
     private selectedZone: VerticalSliceZone = 'edge';
     private lastImpactKey: string | null = null;
 
     create() {
-      this.add.rectangle(640, 360, 1_120, 640, 0x130e0d, 0.98);
-      this.add.rectangle(640, 134, 1_040, 150, 0x080607, 0.96);
-      this.add.rectangle(640, 168, 360, 70, 0x25100f, 0.8);
-      this.add.rectangle(640, 314, 920, 6, 0xc7a06b, 0.45);
-      this.add.rectangle(640, 452, 980, 330, 0x241715, 0.86);
-      this.add.rectangle(640, 632, 980, 110, 0x1a1211, 0.9);
-      this.add.rectangle(232, 112, 334, 132, 0x090808, 0.88).setOrigin(0, 0);
+      controller.reset();
+      const initialSnapshot = controller.getSnapshot();
+      this.selectedZone = initialSnapshot.player.zone;
 
-      this.add.text(254, 134, 'Venue Readout', {
+      this.venueBackdrop = this.add.rectangle(640, 360, 1_120, 640, 0x130e0d, 0.98);
+      this.add.rectangle(640, 134, 1_040, 150, 0x080607, 0.96);
+      this.bandArea = this.add.rectangle(640, 168, 360, 70, 0x25100f, 0.8);
+      this.barrierLine = this.add.rectangle(640, 314, 920, 6, 0xc7a06b, 0.45);
+      this.pitFloor = this.add.rectangle(640, 452, 980, 330, 0x241715, 0.86);
+      this.edgeLane = this.add.rectangle(640, 632, 980, 110, 0x1a1211, 0.9);
+      this.readoutPanel = this.add.rectangle(232, 112, 334, 132, 0x090808, 0.88).setOrigin(0, 0);
+
+      this.venueReadoutLabel = this.add.text(254, 134, 'Venue Readout', {
         fontFamily: 'Segoe UI, sans-serif',
         fontSize: '18px',
         color: '#f3d6a1',
@@ -241,17 +358,17 @@ export function buildVerticalSliceScene(controller: VerticalSliceController) {
         wordWrap: { width: 290 },
       });
 
-      this.add.text(520, 136, 'Band', {
+      this.bandLabel = this.add.text(520, 136, 'Band', {
         fontFamily: 'Segoe UI, sans-serif',
         fontSize: '24px',
         color: '#f7efe1',
       });
-      this.add.text(580, 332, 'Barrier', {
+      this.barrierLabel = this.add.text(580, 332, 'Barrier', {
         fontFamily: 'Segoe UI, sans-serif',
         fontSize: '14px',
         color: '#c8a77a',
       });
-      this.add.text(566, 602, 'Edge Lane', {
+      this.edgeLabel = this.add.text(566, 602, 'Edge Lane', {
         fontFamily: 'Segoe UI, sans-serif',
         fontSize: '14px',
         color: '#b89572',
@@ -270,6 +387,8 @@ export function buildVerticalSliceScene(controller: VerticalSliceController) {
         edge: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT),
         side: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT),
       };
+
+      this.renderSnapshot(initialSnapshot, false);
     }
 
     update(_time: number, delta: number) {
@@ -288,16 +407,32 @@ export function buildVerticalSliceScene(controller: VerticalSliceController) {
       );
 
       this.selectedZone = input.targetZone;
-      controller.step(input, delta);
+      const result = stepSceneController(controller, input, delta);
+      this.renderSnapshot(result.snapshot, result.punchDetected);
+    }
 
-      const snapshot = controller.getSnapshot();
+    private renderSnapshot(snapshot: VerticalSliceSession, punchDetected: boolean) {
       const bodyLayout = buildCrowdBodyLayout(snapshot.frame);
+      const palette = resolveSliceLightPalette(snapshot.frame.lightCue);
       this.crowdGraphics.clear();
+
+      this.venueBackdrop.setFillStyle(palette.venueFill, palette.bodyAlpha);
+      this.bandArea.setFillStyle(palette.bandFill, palette.bodyAlpha);
+      this.barrierLine.setFillStyle(palette.barrierFill, 0.58);
+      this.pitFloor.setFillStyle(palette.pitFill, 0.9);
+      this.edgeLane.setFillStyle(palette.edgeFill, 0.94);
+      this.readoutPanel.setFillStyle(palette.panelFill, 0.9);
+      this.venueReadoutLabel.setColor(palette.accentText);
+      this.phaseText.setColor(palette.accentText);
+      this.summaryText.setColor(palette.accentText);
+      this.bandLabel.setColor(palette.accentText);
+      this.barrierLabel.setColor(palette.accentText);
+      this.edgeLabel.setColor(palette.accentText);
 
       for (const body of bodyLayout) {
         const width = 22 * body.scale;
         const height = 44 * body.scale;
-        this.crowdGraphics.fillStyle(body.tint, 0.88);
+        this.crowdGraphics.fillStyle(body.tint, palette.crowdAlpha);
         this.crowdGraphics.fillRoundedRect(body.x - width / 2, body.y - height / 2, width, height, 8);
       }
 
@@ -309,7 +444,7 @@ export function buildVerticalSliceScene(controller: VerticalSliceController) {
       this.player.setAngle(poseStyle.angle);
 
       const impactKey = snapshot.frame.cameraCue === 'punch' ? getVerticalSliceWindowKey(snapshot.frame) : null;
-      if (impactKey && impactKey !== this.lastImpactKey) {
+      if (punchDetected && impactKey && impactKey !== this.lastImpactKey) {
         this.cameras.main.shake(120, 0.0045);
         this.cameras.main.zoomTo(1.025, 90);
         this.lastImpactKey = impactKey;
