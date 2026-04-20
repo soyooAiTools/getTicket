@@ -1,15 +1,20 @@
 import type { SectionKind, SongProfile } from '../game/domain/song-profile';
 import {
   acceptSectionReview,
+  buildReviewedProfileDraft,
   applySectionOverride,
   buildPlayableProfile,
   getLowConfidenceSections,
+  setReviewName,
+  setSectionChaos,
   type ReviewSession,
 } from '../game/review/review-session';
 
 interface ReviewPanelProps {
   session: ReviewSession | null;
   onChange(next: ReviewSession): void;
+  onSave(profile: ReturnType<typeof buildReviewedProfileDraft>): void;
+  saveMessage?: string | null;
   onPlay(profile: SongProfile): void;
 }
 
@@ -22,7 +27,7 @@ const sectionKinds: SectionKind[] = [
   'recovery',
 ];
 
-export function ReviewPanel({ session, onChange, onPlay }: ReviewPanelProps) {
+export function ReviewPanel({ session, onChange, onSave, saveMessage, onPlay }: ReviewPanelProps) {
   if (!session) {
     return null;
   }
@@ -32,11 +37,25 @@ export function ReviewPanel({ session, onChange, onPlay }: ReviewPanelProps) {
   return (
     <section className='panel'>
       <h2>Review Pass</h2>
+      <label className='review-name'>
+        <span>Reviewed profile name</span>
+        <input
+          className='form-control'
+          value={session.name}
+          onChange={(event) => onChange(setReviewName(session, event.target.value))}
+          placeholder={session.draft.title}
+        />
+      </label>
+      <p className='review-source'>Source: {session.draft.title}</p>
+      {saveMessage ? <p className='review-status'>{saveMessage}</p> : null}
       {lowConfidence.map(({ section, index }) => (
-        <label key={`${section.startMs}-${section.endMs}`} className='review-row'>
-          <span>
-            {section.startMs}ms - {section.endMs}ms
-          </span>
+        <article key={`${section.startMs}-${section.endMs}`} className='review-row'>
+          <div className='review-row-copy'>
+            <strong>
+              {section.startMs}ms - {section.endMs}ms
+            </strong>
+            <p>Confidence {Math.round(section.confidence * 100)}%</p>
+          </div>
           <div className='review-actions'>
             <select
               className='form-control'
@@ -51,6 +70,19 @@ export function ReviewPanel({ session, onChange, onPlay }: ReviewPanelProps) {
                 </option>
               ))}
             </select>
+            <label className='review-range'>
+              <span>Chaos {Math.round((session.overrides.sectionChaos[index] ?? section.chaos) * 100)}%</span>
+              <input
+                type='range'
+                min='0'
+                max='100'
+                step='1'
+                value={Math.round((session.overrides.sectionChaos[index] ?? section.chaos) * 100)}
+                onChange={(event) =>
+                  onChange(setSectionChaos(session, index, Number(event.target.value) / 100))
+                }
+              />
+            </label>
             <button
               type='button'
               className='form-control'
@@ -59,15 +91,16 @@ export function ReviewPanel({ session, onChange, onPlay }: ReviewPanelProps) {
               Accept Current Label
             </button>
           </div>
-        </label>
+        </article>
       ))}
-      <button
-        type='button'
-        className='form-control'
-        onClick={() => onPlay(buildPlayableProfile(session))}
-      >
-        Play Reviewed Profile
-      </button>
+      <div className='review-footer'>
+        <button type='button' className='form-control' onClick={() => onSave(buildReviewedProfileDraft(session))}>
+          Save reviewed profile
+        </button>
+        <button type='button' className='form-control' onClick={() => onPlay(buildPlayableProfile(session))}>
+          Play reviewed profile
+        </button>
+      </div>
     </section>
   );
 }

@@ -12,8 +12,9 @@ export function UploadPanel({ onDraftReady }: UploadPanelProps) {
   const [status, setStatus] = useState('No upload yet');
 
   return (
-    <section className='panel'>
+    <section className='panel upload-panel'>
       <h2>Upload Song</h2>
+      <p>Upload a local track to draft a reviewable profile in the browser.</p>
       <input
         type='file'
         accept='.mp3,.wav,.ogg'

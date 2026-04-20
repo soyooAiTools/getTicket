@@ -13,10 +13,12 @@ import {
   buildPlayableProfile,
   createReviewSession,
   getLowConfidenceSections,
+  setReviewName,
+  setSectionChaos,
 } from './review-session';
 
 describe('review session', () => {
-  it('surfaces uncertain sections and applies section relabels', () => {
+  it('surfaces uncertain sections and applies name, section, and chaos overrides', () => {
     const session = createReviewSession({
       ...authoredSongProfile,
       sections: authoredSongProfile.sections.map((section, index) => ({
@@ -27,8 +29,14 @@ describe('review session', () => {
 
     expect(getLowConfidenceSections(session)).toHaveLength(1);
 
-    const updated = applySectionOverride(session, 2, 'two-step');
-    expect(buildPlayableProfile(updated).sections[2].kind).toBe('two-step');
+    const renamed = setReviewName(session, 'Weekend Chain');
+    const relabeled = applySectionOverride(renamed, 2, 'two-step');
+    const adjusted = setSectionChaos(relabeled, 2, 0.84);
+    const playable = buildPlayableProfile(adjusted);
+
+    expect(playable.title).toBe('Weekend Chain');
+    expect(playable.sections[2].kind).toBe('two-step');
+    expect(playable.sections[2].chaos).toBe(0.84);
   });
 
   it('allows a low-confidence section to be accepted without changing its label', () => {
@@ -64,6 +72,7 @@ describe('review session', () => {
       createElement(ReviewPanel, {
         session,
         onChange: () => undefined,
+        onSave: () => undefined,
         onPlay: () => undefined,
       }),
     );

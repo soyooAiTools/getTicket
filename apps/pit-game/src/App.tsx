@@ -2,14 +2,16 @@ import { startTransition, useEffect, useRef, useState } from 'react';
 
 import { ResultsPanel } from './components/ResultsPanel';
 import { GameHud } from './components/GameHud';
+import { ProfileLibrary } from './components/ProfileLibrary';
 import { ReviewPanel } from './components/ReviewPanel';
 import { UploadPanel } from './components/UploadPanel';
 import { authoredSongProfile } from './game/fixtures/authored-song-profile';
+import { saveReviewedProfile } from './game/persistence/song-profile-storage';
 import type { GameSession } from './game/runtime/game-session';
 import { createReviewSession, type ReviewSession } from './game/review/review-session';
 import { createRuntimeController } from './game/runtime/runtime-controller';
 
-type AppMode = 'authored' | 'reviewing' | 'uploaded';
+type AppMode = 'authored' | 'reviewing' | 'playing';
 
 export function App() {
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -25,6 +27,8 @@ export function App() {
   const [session, setSession] = useState(() => controller.getSnapshot());
   const [mode, setMode] = useState<AppMode>('authored');
   const [reviewSession, setReviewSession] = useState<ReviewSession | null>(null);
+  const [libraryRevision, setLibraryRevision] = useState(0);
+  const [reviewSaveMessage, setReviewSaveMessage] = useState<string | null>(null);
 
   useEffect(() => {
     latestSessionRef.current = controller.getSnapshot();
@@ -91,6 +95,7 @@ export function App() {
         <UploadPanel
           onDraftReady={(draftProfile) => {
             setReviewSession(createReviewSession(draftProfile));
+            setReviewSaveMessage(null);
             setMode('reviewing');
           }}
         />
@@ -108,13 +113,34 @@ export function App() {
         <ReviewPanel
           session={mode === 'reviewing' ? reviewSession : null}
           onChange={setReviewSession}
+          saveMessage={reviewSaveMessage}
+          onSave={(draft) => {
+            const savedProfile = saveReviewedProfile(draft);
+
+            if (savedProfile) {
+              setLibraryRevision((value) => value + 1);
+              setReviewSaveMessage(`Saved ${savedProfile.name} locally.`);
+              return;
+            }
+
+            setReviewSaveMessage('Could not save this profile in local storage.');
+          }}
           onPlay={(profile) => {
             controller.reset(profile);
             latestSessionRef.current = controller.getSnapshot();
             startTransition(() => {
               setSession(controller.getSnapshot());
             });
-            setMode('uploaded');
+            setReviewSaveMessage(null);
+            setMode('playing');
+          }}
+        />
+        <ProfileLibrary
+          revision={libraryRevision}
+          onLoad={(profile) => {
+            setReviewSession(createReviewSession(profile.profile, profile.name, profile.review));
+            setReviewSaveMessage(`Loaded ${profile.name} from local storage.`);
+            setMode('reviewing');
           }}
         />
         <section className='panel stage-panel'>

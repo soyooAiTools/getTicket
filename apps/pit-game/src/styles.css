@@ -39,11 +39,78 @@ body {
 
 .review-row {
   display: grid;
-  gap: 8px;
+  gap: 12px;
   margin-bottom: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .review-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.review-row-copy,
+.review-name,
+.library-header {
+  display: grid;
+  gap: 6px;
+}
+
+.review-name {
+  margin-bottom: 14px;
+}
+
+.review-source,
+.review-status,
+.library-empty,
+.library-status {
+  margin: 0 0 14px;
+  color: #d9c7b6;
+}
+
+.review-range {
+  display: grid;
+  gap: 6px;
+  color: #d9c7b6;
+}
+
+.review-footer {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.profile-library {
+  display: grid;
+  gap: 16px;
+}
+
+.library-list {
+  display: grid;
+  gap: 12px;
+}
+
+.library-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(10, 7, 7, 0.58);
+}
+
+.library-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.library-copy p,
+.library-copy small {
+  margin: 0;
+  color: #d4c1b0;
+}
+
+.library-actions {
   display: grid;
   gap: 8px;
 }
@@ -143,6 +210,11 @@ body {
 .stage-panel {
   display: grid;
   gap: 16px;
+}
+
+.upload-panel {
+  display: grid;
+  gap: 12px;
 }
 
 .game-mount {
