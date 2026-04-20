@@ -65,7 +65,15 @@ const presetMap: Record<SectionKind, Omit<ShowFrame, 'section'>> = {
 };
 
 export function createShowFrame(profile: SongProfile, atMs: number): ShowFrame {
-  const section = findSectionAtMs(profile, atMs) ?? profile.sections[profile.sections.length - 1];
+  if (profile.sections.length === 0) {
+    throw new Error('Profile has no sections');
+  }
+
+  const section = findSectionAtMs(profile, atMs);
+  if (!section) {
+    throw new Error(`No section found for timestamp ${atMs}`);
+  }
+
   return {
     section: section.kind,
     ...presetMap[section.kind],

@@ -32,6 +32,10 @@ export interface SongProfile {
 export function validateSongProfile(profile: SongProfile): string[] {
   const errors: string[] = [];
 
+  if (profile.sections.length === 0) {
+    errors.push('profile has no sections');
+  }
+
   for (let index = 0; index < profile.sections.length; index += 1) {
     const current = profile.sections[index];
     const previous = profile.sections[index - 1];
