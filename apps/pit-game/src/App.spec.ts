@@ -322,6 +322,16 @@ describe('App review shell flows', () => {
     document.body.innerHTML = '';
   });
 
+  it('signals that the live pit simulation is already running on first load', () => {
+    const view = renderApp();
+
+    expect(view.container.textContent).toContain('Simulation live');
+    expect(view.container.textContent).toContain('HUD is already updating from the default authored profile.');
+    expect(view.container.textContent).not.toContain('Runtime modules land next.');
+
+    view.unmount();
+  });
+
   it('keeps the review shell reachable after preview and full play launched from review mode', () => {
     const view = renderApp();
 

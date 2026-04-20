@@ -8,5 +8,7 @@ it('renders the pit-game shell copy', () => {
   const html = renderToStaticMarkup(createElement(App));
 
   expect(html).toContain('Hardcore Pit Prototype');
-  expect(html).toContain('Workspace bootstrapped. Runtime modules land next.');
+  expect(html).toContain('Simulation live');
+  expect(html).toContain('HUD is already updating from the default authored profile.');
+  expect(html).not.toContain('Workspace bootstrapped. Runtime modules land next.');
 });

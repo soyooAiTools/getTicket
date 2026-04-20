@@ -274,11 +274,18 @@ export function App() {
         <section className='panel stage-panel'>
           <header className='stage-copy'>
             <h1>Hardcore Pit Prototype</h1>
-            <p>Workspace bootstrapped. Runtime modules land next.</p>
+            <p className='stage-live-copy'>Simulation live</p>
+            <p>HUD is already updating from the default authored profile.</p>
             <p>Upload a local track or load a built-in sample profile to draft a playable profile in the browser.</p>
             <p>Controls: hold A/S/D/F/E for actions, use arrow keys to target edge, center, front, or side.</p>
           </header>
-          <div ref={mountRef} className='game-mount' />
+          <div className='game-mount-shell'>
+            <div className='game-mount-overlay'>
+              <span className='game-mount-pill'>Live pit</span>
+              <p>Load a sample or upload a track, then steer the room with the keyboard while the HUD reacts in real time.</p>
+            </div>
+            <div ref={mountRef} className='game-mount' />
+          </div>
         </section>
       </div>
       <GameHud session={session} />

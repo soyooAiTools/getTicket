@@ -331,9 +331,27 @@ body {
   gap: 16px;
 }
 
+.stage-live-copy {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgba(243, 195, 131, 0.36);
+  background: rgba(243, 195, 131, 0.12);
+  color: #fff1d0;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.74rem;
+}
+
 .upload-panel {
   display: grid;
   gap: 12px;
+}
+
+.game-mount-shell {
+  position: relative;
 }
 
 .game-mount {
@@ -343,6 +361,47 @@ body {
   background:
     radial-gradient(circle at top, rgba(243, 195, 131, 0.08), transparent 42%),
     linear-gradient(180deg, rgba(8, 8, 8, 0.65), rgba(35, 12, 10, 0.85));
+}
+
+.game-mount canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.game-mount-overlay {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  z-index: 1;
+  display: grid;
+  gap: 10px;
+  max-width: 340px;
+  padding: 14px 16px;
+  border: 1px solid rgba(243, 195, 131, 0.24);
+  background: rgba(18, 10, 8, 0.84);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.24);
+  pointer-events: none;
+}
+
+.game-mount-overlay p {
+  margin: 0;
+  color: #e3d5c9;
+  line-height: 1.5;
+}
+
+.game-mount-pill {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgba(243, 195, 131, 0.42);
+  background: rgba(243, 195, 131, 0.16);
+  color: #fff1d0;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.72rem;
 }
 
 .stage-copy h1,
