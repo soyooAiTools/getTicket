@@ -109,6 +109,7 @@ describe('vertical slice scene helpers', () => {
   it('detects punch cues even when the scene advances through a large hitch', () => {
     const controller = createVerticalSliceController(minorityThreatVerticalSlice);
     controller.step({ action: 'brace', targetZone: 'edge' }, 8_700);
+    const expectedPunchKey = 'event:breakdown-hit:9000';
 
     const result = stepSceneController(
       controller,
@@ -117,6 +118,7 @@ describe('vertical slice scene helpers', () => {
     );
 
     expect(result.punchDetected).toBe(true);
+    expect(result.punchWindowKey).toBe(expectedPunchKey);
     expect(result.snapshot.elapsedMs).toBe(9_500);
     expect(result.snapshot.frame.cameraCue).toBe('steady');
   });

@@ -55,6 +55,7 @@ export interface SliceLightPalette {
 export interface SceneStepResult {
   snapshot: VerticalSliceSession;
   punchDetected: boolean;
+  punchWindowKey: string | null;
 }
 
 const ZONE_BOUNDS: Record<VerticalSliceZone, { centerX: number; centerY: number; width: number; height: number }> = {
@@ -296,16 +297,20 @@ export function stepSceneController(
   let remainingMs = safeDelta;
   let snapshot = controller.getSnapshot();
   let punchDetected = snapshot.frame.cameraCue === 'punch';
+  let punchWindowKey = punchDetected ? getVerticalSliceWindowKey(snapshot.frame) : null;
 
   while (remainingMs > 0) {
     const sliceMs = Math.min(remainingMs, maxStepMs);
     controller.step(input, sliceMs);
     snapshot = controller.getSnapshot();
-    punchDetected = punchDetected || snapshot.frame.cameraCue === 'punch';
+    if (snapshot.frame.cameraCue === 'punch') {
+      punchDetected = true;
+      punchWindowKey = getVerticalSliceWindowKey(snapshot.frame);
+    }
     remainingMs -= sliceMs;
   }
 
-  return { snapshot, punchDetected };
+  return { snapshot, punchDetected, punchWindowKey };
 }
 
 export function buildVerticalSliceScene(controller: VerticalSliceController) {
@@ -388,7 +393,7 @@ export function buildVerticalSliceScene(controller: VerticalSliceController) {
         side: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT),
       };
 
-      this.renderSnapshot(initialSnapshot, false);
+      this.renderSnapshot(initialSnapshot, false, null);
     }
 
     update(_time: number, delta: number) {
@@ -408,10 +413,10 @@ export function buildVerticalSliceScene(controller: VerticalSliceController) {
 
       this.selectedZone = input.targetZone;
       const result = stepSceneController(controller, input, delta);
-      this.renderSnapshot(result.snapshot, result.punchDetected);
+      this.renderSnapshot(result.snapshot, result.punchDetected, result.punchWindowKey);
     }
 
-    private renderSnapshot(snapshot: VerticalSliceSession, punchDetected: boolean) {
+    private renderSnapshot(snapshot: VerticalSliceSession, punchDetected: boolean, punchWindowKey: string | null) {
       const bodyLayout = buildCrowdBodyLayout(snapshot.frame);
       const palette = resolveSliceLightPalette(snapshot.frame.lightCue);
       this.crowdGraphics.clear();
@@ -443,7 +448,7 @@ export function buildVerticalSliceScene(controller: VerticalSliceController) {
       this.player.setScale(poseStyle.scaleX, poseStyle.scaleY);
       this.player.setAngle(poseStyle.angle);
 
-      const impactKey = snapshot.frame.cameraCue === 'punch' ? getVerticalSliceWindowKey(snapshot.frame) : null;
+      const impactKey = punchWindowKey ?? (snapshot.frame.cameraCue === 'punch' ? getVerticalSliceWindowKey(snapshot.frame) : null);
       if (punchDetected && impactKey && impactKey !== this.lastImpactKey) {
         this.cameras.main.shake(120, 0.0045);
         this.cameras.main.zoomTo(1.025, 90);
