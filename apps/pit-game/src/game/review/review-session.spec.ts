@@ -49,6 +49,22 @@ describe('review session authoring', () => {
     expect(buildPlayableProfile(withImpact).impacts.some((item) => item.strength === 'stop')).toBe(true);
   });
 
+  it('warns when authored sections leave a gap', () => {
+    const baseSession = createReviewSession(draft);
+    const session = {
+      ...baseSession,
+      overlay: {
+        ...baseSession.overlay,
+        sections: [
+          { ...baseSession.overlay.sections[0]!, endMs: 7_500 },
+          ...baseSession.overlay.sections.slice(1),
+        ],
+      },
+    };
+
+    expect(getAuthoringWarnings(session)).toContain('section-gap-0');
+  });
+
   it('warns when recovery contains drop markers', () => {
     const session = addImpactMarker(createReviewSession(draft), { atMs: 13_100, strength: 'drop' });
 
