@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { buildDraftSongProfile } from '../game/analysis/draft-song-profile';
+import { buildValidatedDraftSongProfile } from '../game/analysis/draft-song-profile';
 import { decodeAudioFile } from '../game/analysis/decode-audio-file';
 import type { SongProfile } from '../game/domain/song-profile';
 
@@ -23,16 +23,20 @@ export function UploadPanel({ onDraftReady }: UploadPanelProps) {
             return;
           }
 
+          const input = event.currentTarget;
+
           void (async () => {
             try {
               setStatus(`Analyzing ${file.name}...`);
               const analysis = await decodeAudioFile(file);
-              onDraftReady(buildDraftSongProfile(analysis));
+              onDraftReady(buildValidatedDraftSongProfile(analysis));
               setStatus(`Draft ready for ${analysis.title}`);
             } catch (error) {
               const message =
                 error instanceof Error ? error.message : 'Unable to analyze this audio file.';
               setStatus(message);
+            } finally {
+              input.value = '';
             }
           })();
         }}

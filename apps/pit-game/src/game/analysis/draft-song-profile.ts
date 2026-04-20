@@ -1,4 +1,4 @@
-import type { SongProfile, SongSection } from '../domain/song-profile';
+import { validateSongProfile, type SongProfile, type SongSection } from '../domain/song-profile';
 
 export interface AnalysisInput {
   title: string;
@@ -57,4 +57,15 @@ export function buildDraftSongProfile(input: AnalysisInput): SongProfile {
       strength: index === input.impactMoments.length - 1 ? 'drop' : 'accent',
     })),
   };
+}
+
+export function buildValidatedDraftSongProfile(input: AnalysisInput): SongProfile {
+  const profile = buildDraftSongProfile(input);
+  const [validationError] = validateSongProfile(profile);
+
+  if (validationError) {
+    throw new Error(validationError);
+  }
+
+  return profile;
 }

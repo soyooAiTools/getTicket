@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildDraftSongProfile } from './draft-song-profile';
+import { buildDraftSongProfile, buildValidatedDraftSongProfile } from './draft-song-profile';
 
 describe('draft song profile', () => {
   it('turns a high-energy drop into a breakdown section with a drop marker', () => {
@@ -22,5 +22,18 @@ describe('draft song profile', () => {
 
     expect(profile.sections.some((section) => section.kind === 'breakdown')).toBe(true);
     expect(profile.impacts.some((impact) => impact.strength === 'drop')).toBe(true);
+  });
+
+  it('rejects analysis input that produces an invalid song profile', () => {
+    expect(() =>
+      buildValidatedDraftSongProfile({
+        title: 'Empty Analysis',
+        durationMs: 48_000,
+        bpm: 176,
+        beatGridMs: [],
+        energyFrames: [],
+        impactMoments: [],
+      }),
+    ).toThrowError('profile has no sections');
   });
 });
