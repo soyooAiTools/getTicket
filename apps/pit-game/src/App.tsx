@@ -1,6 +1,7 @@
 import { startTransition, useEffect, useRef, useState } from 'react';
 
 import { GameHud } from './components/GameHud';
+import { UploadPanel } from './components/UploadPanel';
 import { authoredSongProfile } from './game/fixtures/authored-song-profile';
 import type { GameSession } from './game/runtime/game-session';
 import { createRuntimeController } from './game/runtime/runtime-controller';
@@ -79,13 +80,25 @@ export function App() {
 
   return (
     <main className='runtime-shell'>
-      <section className='panel stage-panel'>
-        <header className='stage-copy'>
-          <h1>Hardcore Pit Prototype</h1>
-          <p>Workspace bootstrapped. Runtime modules land next.</p>
-        </header>
-        <div ref={mountRef} className='game-mount' />
-      </section>
+      <div>
+        <UploadPanel
+          onDraftReady={(draftProfile) => {
+            controller.reset(draftProfile);
+            latestSessionRef.current = controller.getSnapshot();
+            startTransition(() => {
+              setSession(controller.getSnapshot());
+            });
+          }}
+        />
+        <section className='panel stage-panel'>
+          <header className='stage-copy'>
+            <h1>Hardcore Pit Prototype</h1>
+            <p>Workspace bootstrapped. Runtime modules land next.</p>
+            <p>Upload a local track to draft a playable profile in the browser.</p>
+          </header>
+          <div ref={mountRef} className='game-mount' />
+        </section>
+      </div>
       <GameHud session={session} />
     </main>
   );
