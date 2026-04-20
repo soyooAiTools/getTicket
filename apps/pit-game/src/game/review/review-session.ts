@@ -62,6 +62,16 @@ function cloneImpact(impact: AuthoredImpact): AuthoredImpact {
   return { ...impact };
 }
 
+function isStorageCompatibleImpact(impact: ImpactMarker): impact is ImpactMarker & { strength: 'accent' | 'drop' } {
+  return impact.strength === 'accent' || impact.strength === 'drop';
+}
+
+function toPlayableImpacts(session: ReviewSession): ImpactMarker[] {
+  return session.overlay.impacts
+    .filter((impact) => impact.reviewState !== 'suggested')
+    .map(({ reviewState, source, ...impact }) => impact);
+}
+
 function toReviewDraft(draftOrProfile: AnalysisDraft | SongProfile): ReviewDraft {
   if ('sourceTitle' in draftOrProfile) {
     return {
@@ -206,18 +216,22 @@ export function moveSectionBoundary(
   }
 
   if (edge === 'end' && following) {
-    const bounded = Math.max(current.startMs, Math.min(snapped, following.endMs));
-    current.endMs = bounded;
+    if (snapped <= current.startMs || snapped >= following.endMs) {
+      return session;
+    }
+    current.endMs = snapped;
     current.reviewState = 'modified';
-    following.startMs = bounded;
+    following.startMs = snapped;
     following.reviewState = 'modified';
   }
 
   if (edge === 'start' && previous) {
-    const bounded = Math.max(previous.startMs, Math.min(snapped, current.endMs));
-    current.startMs = bounded;
+    if (snapped <= previous.startMs || snapped >= current.endMs) {
+      return session;
+    }
+    current.startMs = snapped;
     current.reviewState = 'modified';
-    previous.endMs = bounded;
+    previous.endMs = snapped;
     previous.reviewState = 'modified';
   }
 
@@ -394,7 +408,7 @@ export function buildPlayableProfile(session: ReviewSession): SongProfile {
     ...session.draft.profile,
     title: session.name.trim() || session.draft.profile.title,
     sections: session.overlay.sections.map(({ reviewState, sourceIndex, ...section }) => section),
-    impacts: session.overlay.impacts.map(({ reviewState, source, ...impact }) => impact),
+    impacts: toPlayableImpacts(session),
   };
 }
 
@@ -402,7 +416,10 @@ export function buildReviewedProfileDraft(session: ReviewSession): ReviewedProfi
   return {
     name: session.name.trim() || session.draft.profile.title,
     sourceTitle: session.draft.sourceTitle,
-    profile: buildPlayableProfile(session),
+    profile: {
+      ...buildPlayableProfile(session),
+      impacts: toPlayableImpacts(session).filter(isStorageCompatibleImpact),
+    },
     review: buildOverridesFromOverlay(session),
   };
 }

@@ -4,6 +4,7 @@ import { createAnalysisDraft } from '../domain/analysis-draft';
 import {
   addImpactMarker,
   buildPlayableProfile,
+  buildReviewedProfileDraft,
   createReviewSession,
   getAuthoringWarnings,
   mergeSectionForward,
@@ -49,6 +50,28 @@ describe('review session authoring', () => {
     expect(buildPlayableProfile(withImpact).impacts.some((item) => item.strength === 'stop')).toBe(true);
   });
 
+  it('excludes suggested impact candidates from the playable profile until accepted or authored', () => {
+    const playable = buildPlayableProfile(createReviewSession(draft));
+
+    expect(playable.impacts).toEqual([{ atMs: 8_000, strength: 'drop' }]);
+  });
+
+  it('keeps the legacy reviewed-profile draft storage-compatible when authored impacts include hit or stop', () => {
+    const sessionWithUserImpacts = addImpactMarker(
+      addImpactMarker(createReviewSession(draft), { atMs: 11_250, strength: 'stop' }),
+      { atMs: 7_875, strength: 'hit' },
+    );
+
+    expect(buildPlayableProfile(sessionWithUserImpacts).impacts).toEqual([
+      { atMs: 7_875, strength: 'hit' },
+      { atMs: 8_000, strength: 'drop' },
+      { atMs: 11_250, strength: 'stop' },
+    ]);
+    expect(buildReviewedProfileDraft(sessionWithUserImpacts).profile.impacts).toEqual([
+      { atMs: 8_000, strength: 'drop' },
+    ]);
+  });
+
   it('warns when authored sections leave a gap', () => {
     const baseSession = createReviewSession(draft);
     const session = {
@@ -69,5 +92,16 @@ describe('review session authoring', () => {
     const session = addImpactMarker(createReviewSession(draft), { atMs: 13_100, strength: 'drop' });
 
     expect(getAuthoringWarnings(session)).toContain('recovery-drop-2');
+  });
+
+  it('does not create zero-length sections when a boundary drag hits a neighboring limit', () => {
+    const session = createReviewSession(draft);
+    const endClamped = moveSectionBoundary(session, 0, 'end', 0);
+    const startClamped = moveSectionBoundary(session, 1, 'start', 12_000);
+
+    expect(endClamped.overlay.sections[0]).toMatchObject({ startMs: 0, endMs: 8_000 });
+    expect(endClamped.overlay.sections[1]).toMatchObject({ startMs: 8_000, endMs: 12_000 });
+    expect(startClamped.overlay.sections[1]).toMatchObject({ startMs: 8_000, endMs: 12_000 });
+    expect(startClamped.overlay.sections[0]).toMatchObject({ startMs: 0, endMs: 8_000 });
   });
 });
