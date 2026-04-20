@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import type { AnalysisInput } from './draft-song-profile';
 import { buildAnalysisDraft, buildDraftSongProfile, buildValidatedDraftSongProfile } from './draft-song-profile';
 
 describe('draft song profile', () => {
@@ -22,6 +23,30 @@ describe('draft song profile', () => {
 
     expect(profile.sections.some((section) => section.kind === 'breakdown')).toBe(true);
     expect(profile.impacts.some((impact) => impact.strength === 'drop')).toBe(true);
+  });
+
+  it('sorts impact moments before assigning strengths in both analysis paths', () => {
+    const input: AnalysisInput = {
+      title: 'Unsorted Impacts',
+      durationMs: 16_000,
+      bpm: 160,
+      beatGridMs: [0, 375, 750, 1_125, 1_500],
+      energyFrames: [
+        { atMs: 0, rms: 0.18 },
+        { atMs: 4_000, rms: 0.62 },
+        { atMs: 8_000, rms: 0.91 },
+        { atMs: 12_000, rms: 0.11 },
+      ],
+      impactMoments: [8_375, 7_500, 8_000],
+    };
+
+    const profile = buildDraftSongProfile(input);
+    const draft = buildAnalysisDraft(input);
+
+    expect(profile.impacts.map((impact) => impact.atMs)).toEqual([7_500, 8_000, 8_375]);
+    expect(profile.impacts.map((impact) => impact.strength)).toEqual(['accent', 'accent', 'drop']);
+    expect(draft.impactCandidates.map((item) => item.atMs)).toEqual([7_500, 8_000, 8_375]);
+    expect(draft.impactCandidates.map((item) => item.strength)).toEqual(['accent', 'drop', 'hit']);
   });
 
   it('emits heavy-song impact candidates without mutating the playable profile', () => {

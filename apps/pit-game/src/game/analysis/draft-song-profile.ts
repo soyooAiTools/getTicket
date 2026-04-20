@@ -13,6 +13,10 @@ export interface AnalysisInput {
 const targetSectionCount = 12;
 const minimumSectionMs = 4_000;
 
+function sortImpactMoments(impactMoments: number[]) {
+  return [...impactMoments].sort((left, right) => left - right);
+}
+
 function getSectionKind(normalized: number): SongSection['kind'] {
   return normalized > 0.82
     ? 'breakdown'
@@ -59,6 +63,7 @@ function buildCoarseFrames(input: AnalysisInput) {
 
 export function buildDraftSongProfile(input: AnalysisInput): SongProfile {
   const coarseFrames = buildCoarseFrames(input);
+  const sortedImpactMoments = sortImpactMoments(input.impactMoments);
   const maxEnergy = Math.max(...coarseFrames.map((frame) => frame.rms), 0.01);
 
   const sections = coarseFrames.reduce<SongSection[]>((result, frame) => {
@@ -92,6 +97,11 @@ export function buildDraftSongProfile(input: AnalysisInput): SongProfile {
     };
   }
 
+  const impacts: SongProfile['impacts'] = sortedImpactMoments.map<SongProfile['impacts'][number]>((atMs, index) => ({
+    atMs,
+    strength: index === sortedImpactMoments.length - 1 ? 'drop' : 'accent',
+  }));
+
   return {
     id: input.title.toLowerCase().replace(/\s+/g, '-'),
     title: input.title,
@@ -99,15 +109,28 @@ export function buildDraftSongProfile(input: AnalysisInput): SongProfile {
     bpm: input.bpm,
     beatGridMs: input.beatGridMs,
     sections,
-    impacts: input.impactMoments.map((atMs, index) => ({
-      atMs,
-      strength: index === input.impactMoments.length - 1 ? 'drop' : 'accent',
-    })),
+    impacts,
   };
 }
 
 export function buildAnalysisDraft(input: AnalysisInput): AnalysisDraft {
   const profile = buildDraftSongProfile(input);
+  const sortedImpactMoments = sortImpactMoments(input.impactMoments);
+  const impactCandidates: AnalysisDraft['impactCandidates'] = sortedImpactMoments.map<AnalysisDraft['impactCandidates'][number]>((atMs, index, all) => {
+    const isLast = index === all.length - 1;
+    const isPenultimate = all.length >= 3 && index === all.length - 2;
+
+    return {
+      atMs,
+      strength: isLast ? 'hit' : isPenultimate ? 'drop' : 'accent',
+      confidence: isLast ? 0.81 : isPenultimate ? 0.69 : 0.62,
+      reasons: isLast
+        ? ['terminal transient cluster']
+        : isPenultimate
+          ? ['trailing impact valley']
+          : ['energy spike'],
+    };
+  });
 
   return createAnalysisDraft({
     id: profile.id,
@@ -118,21 +141,7 @@ export function buildAnalysisDraft(input: AnalysisInput): AnalysisDraft {
       confidence: section.confidence,
       reasons: section.chaos > 0.8 ? ['peak energy bucket'] : ['coarse energy bucket'],
     })),
-    impactCandidates: input.impactMoments.map((atMs, index, all) => {
-      const isLast = index === all.length - 1;
-      const isPenultimate = all.length >= 3 && index === all.length - 2;
-
-      return {
-        atMs,
-        strength: isLast ? 'hit' : isPenultimate ? 'drop' : 'accent',
-        confidence: isLast ? 0.81 : isPenultimate ? 0.69 : 0.62,
-        reasons: isLast
-          ? ['terminal transient cluster']
-          : isPenultimate
-            ? ['trailing impact valley']
-            : ['energy spike'],
-      };
-    }),
+    impactCandidates,
     warnings: profile.sections
       .map((section, index) => ({ section, index }))
       .filter(({ section }) => section.confidence < 0.7)
