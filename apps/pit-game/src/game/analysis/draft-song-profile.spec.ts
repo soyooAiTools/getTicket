@@ -36,4 +36,22 @@ describe('draft song profile', () => {
       }),
     ).toThrowError('profile has no sections');
   });
+
+  it('coarsens dense energy frames into a manageable section count', () => {
+    const profile = buildDraftSongProfile({
+      title: 'Dense Upload',
+      durationMs: 48_000,
+      bpm: 180,
+      beatGridMs: Array.from({ length: 128 }, (_, index) => index * 375),
+      energyFrames: Array.from({ length: 96 }, (_, index) => ({
+        atMs: index * 500,
+        rms: 0.35 + (((index % 8) + 1) * 0.07),
+      })),
+      impactMoments: [12_000, 24_000, 36_000],
+    });
+
+    expect(profile.sections.length).toBeLessThanOrEqual(12);
+    expect(profile.sections[0]?.startMs).toBe(0);
+    expect(profile.sections[profile.sections.length - 1]?.endMs).toBe(48_000);
+  });
 });

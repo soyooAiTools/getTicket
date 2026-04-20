@@ -110,6 +110,7 @@ export function App() {
             <h1>Hardcore Pit Prototype</h1>
             <p>Workspace bootstrapped. Runtime modules land next.</p>
             <p>Upload a local track to draft a playable profile in the browser.</p>
+            <p>Controls: hold A/S/D/F/E for actions, use arrow keys to target edge, center, front, or side.</p>
           </header>
           <div ref={mountRef} className='game-mount' />
         </section>

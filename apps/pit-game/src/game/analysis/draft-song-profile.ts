@@ -9,32 +9,75 @@ export interface AnalysisInput {
   impactMoments: number[];
 }
 
-export function buildDraftSongProfile(input: AnalysisInput): SongProfile {
-  const sortedFrames = [...input.energyFrames].sort((left, right) => left.atMs - right.atMs);
-  const maxEnergy = Math.max(...sortedFrames.map((frame) => frame.rms), 0.01);
+const targetSectionCount = 12;
+const minimumSectionMs = 4_000;
 
-  const sections: SongSection[] = sortedFrames.map((frame, index) => {
-    const next = sortedFrames[index + 1];
-    const normalized = frame.rms / maxEnergy;
-    const kind =
-      normalized > 0.82
-        ? 'breakdown'
-        : normalized > 0.64
-          ? 'side-to-side prep'
-          : normalized > 0.48
-            ? 'two-step'
-            : normalized > 0.24
-              ? 'push'
-              : 'gather';
+function getSectionKind(normalized: number): SongSection['kind'] {
+  return normalized > 0.82
+    ? 'breakdown'
+    : normalized > 0.64
+      ? 'side-to-side prep'
+      : normalized > 0.48
+        ? 'two-step'
+        : normalized > 0.24
+          ? 'push'
+          : 'gather';
+}
+
+function buildCoarseFrames(input: AnalysisInput) {
+  const sortedFrames = [...input.energyFrames].sort((left, right) => left.atMs - right.atMs);
+  if (sortedFrames.length === 0) {
+    return [];
+  }
+
+  const sectionMs = Math.max(minimumSectionMs, Math.ceil(input.durationMs / targetSectionCount));
+  const bucketCount = Math.max(1, Math.ceil(input.durationMs / sectionMs));
+  const buckets = Array.from({ length: bucketCount }, () => ({ sum: 0, count: 0 }));
+
+  for (const frame of sortedFrames) {
+    const bucketIndex = Math.min(bucketCount - 1, Math.floor(frame.atMs / sectionMs));
+    buckets[bucketIndex].sum += frame.rms;
+    buckets[bucketIndex].count += 1;
+  }
+
+  let fallbackRms = sortedFrames[0].rms;
+  return buckets.map((bucket, index) => {
+    const averageRms = bucket.count > 0 ? bucket.sum / bucket.count : fallbackRms;
+    fallbackRms = averageRms;
 
     return {
-      kind,
+      atMs: index * sectionMs,
+      endMs: Math.min(input.durationMs, (index + 1) * sectionMs),
+      rms: averageRms,
+    };
+  });
+}
+
+export function buildDraftSongProfile(input: AnalysisInput): SongProfile {
+  const coarseFrames = buildCoarseFrames(input);
+  const maxEnergy = Math.max(...coarseFrames.map((frame) => frame.rms), 0.01);
+
+  const sections = coarseFrames.reduce<SongSection[]>((result, frame) => {
+    const normalized = frame.rms / maxEnergy;
+    const nextSection: SongSection = {
+      kind: getSectionKind(normalized),
       startMs: frame.atMs,
-      endMs: next?.atMs ?? input.durationMs,
+      endMs: frame.endMs,
       confidence: normalized > 0.8 || normalized < 0.25 ? 0.88 : 0.58,
       chaos: Number(normalized.toFixed(2)),
     };
-  });
+
+    const previous = result[result.length - 1];
+    if (previous?.kind === nextSection.kind) {
+      previous.endMs = nextSection.endMs;
+      previous.chaos = Number(((previous.chaos + nextSection.chaos) / 2).toFixed(2));
+      previous.confidence = Math.max(previous.confidence, nextSection.confidence);
+      return result;
+    }
+
+    result.push(nextSection);
+    return result;
+  }, []);
 
   if (sections.length > 0) {
     sections[sections.length - 1] = {
