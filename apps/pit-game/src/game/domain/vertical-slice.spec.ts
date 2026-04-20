@@ -69,4 +69,33 @@ describe('minorityThreatVerticalSlice', () => {
 
     expect(validateVerticalSliceFixture(fixture)).toContain('profile: first section must start at 0');
   });
+
+  it('rejects an out-of-range phase intensity', () => {
+    const fixture = cloneVerticalSliceFixture();
+    fixture.phases[1] = { ...fixture.phases[1]!, intensity: 1.25 };
+
+    expect(validateVerticalSliceFixture(fixture)).toContain('phase 1 has an invalid intensity');
+  });
+
+  it('rejects an out-of-range event strength', () => {
+    const fixture = cloneVerticalSliceFixture();
+    fixture.events[0] = { ...fixture.events[0]!, strength: -0.1 };
+
+    expect(validateVerticalSliceFixture(fixture)).toContain('event 0 has an invalid strength');
+  });
+
+  it('rejects invalid audio boundaries', () => {
+    const fixture = cloneVerticalSliceFixture();
+    fixture.audio.segmentStartMs = 5_000;
+    fixture.audio.segmentEndMs = 5_000;
+
+    expect(validateVerticalSliceFixture(fixture)).toContain('audio segment boundaries are invalid');
+  });
+
+  it('rejects drift between authored events and profile impacts', () => {
+    const fixture = cloneVerticalSliceFixture();
+    fixture.profile.impacts[2] = { ...fixture.profile.impacts[2]!, strength: 'hit' };
+
+    expect(validateVerticalSliceFixture(fixture)).toContain('fixture event 2 does not match profile impact 2');
+  });
 });

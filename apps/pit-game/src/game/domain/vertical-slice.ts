@@ -41,6 +41,10 @@ export function createSliceImpact(kind: VerticalSliceEventKind, atMs: number): I
   };
 }
 
+function isNormalizedValue(value: number): boolean {
+  return Number.isFinite(value) && value >= 0 && value <= 1;
+}
+
 export function validateVerticalSliceFixture(fixture: VerticalSliceFixture): string[] {
   const errors: string[] = [];
   const durationMs = fixture.profile.durationMs;
@@ -76,6 +80,10 @@ export function validateVerticalSliceFixture(fixture: VerticalSliceFixture): str
         errors.push(`phase ${index} has a non-positive range`);
       }
 
+      if (!isNormalizedValue(current.intensity)) {
+        errors.push(`phase ${index} has an invalid intensity`);
+      }
+
       if (previous && previous.endMs !== current.startMs) {
         errors.push(`phase ${index} must start when phase ${index - 1} ends`);
       }
@@ -92,6 +100,18 @@ export function validateVerticalSliceFixture(fixture: VerticalSliceFixture): str
     if (event.atMs < 0 || event.atMs >= durationMs) {
       errors.push(`event ${index} occurs outside the slice duration`);
     }
+
+    if (!isNormalizedValue(event.strength)) {
+      errors.push(`event ${index} has an invalid strength`);
+    }
+  }
+
+  if (
+    fixture.audio.segmentStartMs < 0 ||
+    fixture.audio.segmentEndMs < 0 ||
+    fixture.audio.segmentEndMs <= fixture.audio.segmentStartMs
+  ) {
+    errors.push('audio segment boundaries are invalid');
   }
 
   if (fixture.audio.segmentEndMs - fixture.audio.segmentStartMs !== durationMs) {
@@ -100,6 +120,25 @@ export function validateVerticalSliceFixture(fixture: VerticalSliceFixture): str
 
   if (fixture.events.length === 0) {
     errors.push('slice must contain authored events');
+  }
+
+  if (fixture.events.length !== fixture.profile.impacts.length) {
+    errors.push('fixture events and profile impacts must stay aligned');
+  } else {
+    for (let index = 0; index < fixture.events.length; index += 1) {
+      const event = fixture.events[index];
+      const impact = fixture.profile.impacts[index];
+
+      if (!event || !impact) {
+        continue;
+      }
+
+      const expectedImpact = createSliceImpact(event.kind, event.atMs);
+
+      if (impact.atMs !== expectedImpact.atMs || impact.strength !== expectedImpact.strength) {
+        errors.push(`fixture event ${index} does not match profile impact ${index}`);
+      }
+    }
   }
 
   errors.push(...validateSongProfile(fixture.profile).map((error) => `profile: ${error}`));
