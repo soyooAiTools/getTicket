@@ -9,6 +9,10 @@ export interface RuntimeController {
   reset(profile: SongProfile): void;
 }
 
+function getLastPlayableMs(profile: SongProfile): number {
+  return Math.max(0, profile.durationMs - 1);
+}
+
 export function createRuntimeController(profile: SongProfile, elapsedMs = 0): RuntimeController {
   let snapshot = createGameSession(profile, elapsedMs);
   const listeners = new Set<(session: GameSession) => void>();
@@ -26,7 +30,15 @@ export function createRuntimeController(profile: SongProfile, elapsedMs = 0): Ru
       return snapshot;
     },
     step(input, dtMs) {
-      snapshot = stepGameSession(snapshot, input, dtMs);
+      const lastPlayableMs = getLastPlayableMs(snapshot.profile);
+      const remainingMs = lastPlayableMs - snapshot.elapsedMs;
+      const safeDtMs = Math.min(dtMs, remainingMs);
+
+      if (safeDtMs <= 0) {
+        return;
+      }
+
+      snapshot = stepGameSession(snapshot, input, safeDtMs);
       publish();
     },
     reset(nextProfile) {
