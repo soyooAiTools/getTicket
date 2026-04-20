@@ -1,62 +1,54 @@
 import { useEffect, useState } from 'react';
 
 import {
-  deleteReviewedProfile,
-  loadReviewedProfiles,
-  type ReviewedProfileRecord,
+  loadSavedAuthoringProjects,
+  type SavedAuthoringProjectRecord,
 } from '../game/persistence/song-profile-storage';
 
 interface ProfileLibraryProps {
   revision: number;
-  onLoad(profile: ReviewedProfileRecord): void;
+  onLoad(profile: SavedAuthoringProjectRecord): void;
+  onRelink?(profile: SavedAuthoringProjectRecord): void;
 }
 
-export function ProfileLibrary({ revision, onLoad }: ProfileLibraryProps) {
-  const [profiles, setProfiles] = useState<ReviewedProfileRecord[]>([]);
-  const [status, setStatus] = useState<string | null>(null);
+export function ProfileLibrary({ revision, onLoad, onRelink }: ProfileLibraryProps) {
+  const [records, setRecords] = useState<SavedAuthoringProjectRecord[]>([]);
 
   useEffect(() => {
-    setProfiles(loadReviewedProfiles());
-    setStatus(null);
+    setRecords(loadSavedAuthoringProjects());
   }, [revision]);
 
   return (
     <section className='panel profile-library'>
       <header className='library-header'>
-        <h2>Saved Reviewed Profiles</h2>
-        <p>Load a reviewed profile without re-uploading the track.</p>
+        <h2>Saved Authoring Projects</h2>
+        <p>Reload your draft and overlay edits. Relink audio when you need local preview again.</p>
       </header>
-      {status ? <p className='library-status'>{status}</p> : null}
 
-      {profiles.length === 0 ? (
-        <p className='library-empty'>No reviewed profiles saved yet.</p>
+      {records.length === 0 ? (
+        <p className='library-empty'>No authoring projects saved yet.</p>
       ) : (
         <div className='library-list'>
-          {profiles.map((profile) => (
-            <article key={profile.id} className='library-card'>
+          {records.map((record) => (
+            <article key={record.id} className='library-card'>
               <div className='library-copy'>
-                <strong>{profile.name}</strong>
-                <p>{profile.sourceTitle}</p>
-                <small>Saved {new Date(profile.savedAt).toLocaleString()}</small>
+                <strong>{record.name}</strong>
+                <p>
+                  {record.requiresAudioRelink
+                    ? 'Audio relink required for waveform and loop preview.'
+                    : 'Audio linked in this session.'}
+                </p>
+                <small>Saved {new Date(record.savedAt).toLocaleString()}</small>
               </div>
               <div className='library-actions'>
-                <button type='button' className='form-control' onClick={() => onLoad(profile)}>
-                  Load
+                <button type='button' className='form-control' onClick={() => onLoad(record)}>
+                  Resume Edit
                 </button>
-                <button
-                  type='button'
-                  className='form-control'
-                  onClick={() => {
-                    if (deleteReviewedProfile(profile.id)) {
-                      setProfiles((current) => current.filter((entry) => entry.id !== profile.id));
-                      setStatus(`Deleted ${profile.name}.`);
-                    } else {
-                      setStatus('Could not delete this saved profile from local storage.');
-                    }
-                  }}
-                >
-                  Delete
-                </button>
+                {record.requiresAudioRelink && onRelink ? (
+                  <button type='button' className='form-control' onClick={() => onRelink(record)}>
+                    Relink Audio
+                  </button>
+                ) : null}
               </div>
             </article>
           ))}

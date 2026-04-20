@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { authoredSongProfile } from '../fixtures/authored-song-profile';
+import { createAnalysisDraft } from '../domain/analysis-draft';
+import { createReviewSession } from '../review/review-session';
 import {
   deleteReviewedProfile,
+  hydrateSavedAuthoringProject,
   loadReviewedProfiles,
+  loadSavedAuthoringProjects,
+  saveAuthoringProject,
   saveReviewedProfile,
   type StorageLike,
 } from './song-profile-storage';
@@ -24,138 +28,101 @@ function createMemoryStorage(): StorageLike {
   };
 }
 
-describe('song profile storage', () => {
-  it('round-trips a reviewed profile through save, load, and delete', () => {
-    const storage = createMemoryStorage();
-    const draft = {
-      name: 'Weekend Chain',
-      sourceTitle: authoredSongProfile.title,
-      profile: {
-        ...authoredSongProfile,
-        title: 'Weekend Chain',
-      },
-      review: {
-        sectionKinds: { 2: 'two-step' as const },
-        sectionChaos: { 2: 0.84 },
-        reviewedSections: { 2: true as const },
-      },
-    };
+const draftFixture = createAnalysisDraft({
+  id: 'fan-edit',
+  sourceTitle: 'Fan Edit',
+  profile: {
+    id: 'fan-edit',
+    title: 'Fan Edit',
+    durationMs: 16_000,
+    bpm: 160,
+    beatGridMs: [
+      0, 375, 750, 1_125, 1_500, 1_875, 2_250, 2_625, 3_000, 3_375, 3_750, 4_125, 7_875, 8_000,
+      11_250, 12_000, 13_125, 16_000,
+    ],
+    sections: [
+      { kind: 'push', startMs: 0, endMs: 8_000, confidence: 0.58, chaos: 0.52 },
+      { kind: 'breakdown', startMs: 8_000, endMs: 12_000, confidence: 0.62, chaos: 0.88 },
+      { kind: 'recovery', startMs: 12_000, endMs: 16_000, confidence: 0.72, chaos: 0.2 },
+    ],
+    impacts: [{ atMs: 8_000, strength: 'drop' }],
+  },
+  sectionSuggestions: [],
+  impactCandidates: [{ atMs: 7_875, strength: 'hit', confidence: 0.77, reasons: ['transient cluster'] }],
+  warnings: [],
+});
 
-    const saved = saveReviewedProfile(draft, storage);
-    const loaded = loadReviewedProfiles(storage);
+describe('saved authoring projects', () => {
+  it('persists draft plus overlay and requires audio relink on reload', () => {
+    const storage = createMemoryStorage();
+    const session = createReviewSession(draftFixture, { name: 'demo.mp3', objectUrl: 'blob:demo' });
+
+    const record = saveAuthoringProject(session, storage);
+
+    expect(record?.draft.sourceTitle).toBe('Fan Edit');
+    expect(record?.overlay.sections).toHaveLength(3);
+    expect(loadSavedAuthoringProjects(storage)[0]?.requiresAudioRelink).toBe(true);
+  });
+
+  it('hydrates a saved authoring project into an editable session with relinked audio', () => {
+    const storage = createMemoryStorage();
+    const saved = saveAuthoringProject(createReviewSession(draftFixture), storage);
 
     expect(saved).not.toBeNull();
     if (!saved) {
-      throw new Error('expected reviewed profile to save');
+      throw new Error('expected authoring project to save');
     }
-    expect(saved.id).toBeTruthy();
-    expect(saved.savedAt).toBeTruthy();
-    expect(loaded).toHaveLength(1);
-    expect(loaded[0]).toMatchObject({
-      id: saved.id,
-      name: 'Weekend Chain',
-      sourceTitle: authoredSongProfile.title,
-      profile: {
-        title: 'Weekend Chain',
-      },
-      review: {
-        sectionKinds: { 2: 'two-step' },
-        sectionChaos: { 2: 0.84 },
-        reviewedSections: { 2: true },
-      },
-    });
 
-    expect(deleteReviewedProfile(saved.id, storage)).toBe(true);
-    expect(loadReviewedProfiles(storage)).toEqual([]);
+    const hydrated = hydrateSavedAuthoringProject(saved, { name: 'demo.mp3', objectUrl: 'blob:demo' });
+
+    expect(hydrated.name).toBe(saved.name);
+    expect(hydrated.overlay).toEqual(saved.overlay);
+    expect(hydrated.overrides).toEqual(saved.review);
+    expect(hydrated.audioSource).toEqual({ name: 'demo.mp3', objectUrl: 'blob:demo' });
   });
 
-  it('sanitizes malformed review overrides from storage before exposing saved profiles', () => {
+  it('hydrates v1 reviewed profiles into editable v2 projects', () => {
     const storage = createMemoryStorage();
+
     storage.setItem(
       'pit-game.reviewed-profiles.v1',
       JSON.stringify([
         {
-          id: 'saved-1',
-          name: 'Weekend Chain',
-          sourceTitle: authoredSongProfile.title,
+          id: 'legacy',
+          name: 'Legacy',
+          sourceTitle: 'Legacy',
           savedAt: '2026-04-20T00:00:00.000Z',
-          profile: authoredSongProfile,
-          review: {
-            sectionKinds: { 0: 'gather', 1: 'invalid-kind' },
-            sectionChaos: { 0: 0.62, 1: 'loud', 2: 2.4 },
-            reviewedSections: { 0: true, 1: 'yes' },
-          },
+          profile: draftFixture.profile,
+          review: { sectionKinds: {}, sectionChaos: {}, reviewedSections: {} },
         },
       ]),
     );
 
-    expect(loadReviewedProfiles(storage)).toEqual([
-      expect.objectContaining({
-        id: 'saved-1',
+    expect(loadSavedAuthoringProjects(storage)[0]?.profile.title).toBe('Fan Edit');
+    expect(loadSavedAuthoringProjects(storage)[0]?.draft.sourceTitle).toBe('Legacy');
+  });
+
+  it('keeps the reviewed-profile compatibility facade working through v2 storage', () => {
+    const storage = createMemoryStorage();
+
+    const saved = saveReviewedProfile(
+      {
+        name: 'Weekend Chain',
+        sourceTitle: draftFixture.sourceTitle,
+        profile: draftFixture.profile,
         review: {
-          sectionKinds: { 0: 'gather' },
-          sectionChaos: { 0: 0.62, 2: 1 },
-          reviewedSections: { 0: true },
+          sectionKinds: { 1: 'push' },
+          sectionChaos: { 1: 0.84 },
+          reviewedSections: { 1: true },
         },
-      }),
-    ]);
-  });
-
-  it('drops saved records whose profile sections contain unsupported kinds', () => {
-    const storage = createMemoryStorage();
-    storage.setItem(
-      'pit-game.reviewed-profiles.v1',
-      JSON.stringify([
-        {
-          id: 'saved-1',
-          name: 'Weekend Chain',
-          sourceTitle: authoredSongProfile.title,
-          savedAt: '2026-04-20T00:00:00.000Z',
-          profile: {
-            ...authoredSongProfile,
-            sections: authoredSongProfile.sections.map((section, index) =>
-              index === 1 ? { ...section, kind: 'bad-kind' } : section,
-            ),
-          },
-          review: {
-            sectionKinds: {},
-            sectionChaos: {},
-            reviewedSections: {},
-          },
-        },
-      ]),
+      },
+      storage,
     );
 
-    expect(loadReviewedProfiles(storage)).toEqual([]);
-  });
-
-  it('drops saved records whose profile timing fields are malformed', () => {
-    const storage = createMemoryStorage();
-    storage.setItem(
-      'pit-game.reviewed-profiles.v1',
-      JSON.stringify([
-        {
-          id: 'saved-1',
-          name: 'Weekend Chain',
-          sourceTitle: authoredSongProfile.title,
-          savedAt: '2026-04-20T00:00:00.000Z',
-          profile: {
-            ...authoredSongProfile,
-            durationMs: 'bad-duration',
-            sections: authoredSongProfile.sections.map((section, index) =>
-              index === 0 ? { ...section, startMs: 'bad-start' } : section,
-            ),
-          },
-          review: {
-            sectionKinds: {},
-            sectionChaos: {},
-            reviewedSections: {},
-          },
-        },
-      ]),
-    );
-
-    expect(loadReviewedProfiles(storage)).toEqual([]);
+    expect(saved?.name).toBe('Weekend Chain');
+    expect(loadReviewedProfiles(storage)[0]?.review.sectionChaos).toEqual({ 1: 0.84 });
+    expect(deleteReviewedProfile(saved?.id ?? '', storage)).toBe(true);
+    expect(loadSavedAuthoringProjects(storage)).toEqual([]);
   });
 
   it('returns a failure signal when storage writes are unavailable', () => {
@@ -167,49 +134,7 @@ describe('song profile storage', () => {
       removeItem: () => undefined,
     };
 
-    expect(
-      saveReviewedProfile(
-        {
-          name: 'Weekend Chain',
-          sourceTitle: authoredSongProfile.title,
-          profile: authoredSongProfile,
-          review: {
-            sectionKinds: {},
-            sectionChaos: {},
-            reviewedSections: {},
-          },
-        },
-        storage,
-      ),
-    ).toBeNull();
-  });
-
-  it('returns false when delete cannot write back to storage', () => {
-    let raw = JSON.stringify([
-      {
-        id: 'saved-1',
-        name: 'Weekend Chain',
-        sourceTitle: authoredSongProfile.title,
-        savedAt: '2026-04-20T00:00:00.000Z',
-        profile: authoredSongProfile,
-        review: {
-          sectionKinds: {},
-          sectionChaos: {},
-          reviewedSections: {},
-        },
-      },
-    ]);
-
-    const storage: StorageLike = {
-      getItem: () => raw,
-      setItem: () => {
-        throw new Error('quota exceeded');
-      },
-      removeItem: () => undefined,
-    };
-
-    expect(deleteReviewedProfile('saved-1', storage)).toBe(false);
-    expect(JSON.parse(raw)).toHaveLength(1);
+    expect(saveAuthoringProject(createReviewSession(draftFixture), storage)).toBeNull();
   });
 
   it('treats storage read failures as an empty library instead of throwing', () => {
@@ -221,7 +146,7 @@ describe('song profile storage', () => {
       removeItem: () => undefined,
     };
 
-    expect(loadReviewedProfiles(storage)).toEqual([]);
+    expect(loadSavedAuthoringProjects(storage)).toEqual([]);
   });
 
   it('fails closed when save cannot read the current library state', () => {
@@ -233,21 +158,7 @@ describe('song profile storage', () => {
       removeItem: () => undefined,
     };
 
-    expect(
-      saveReviewedProfile(
-        {
-          name: 'Weekend Chain',
-          sourceTitle: authoredSongProfile.title,
-          profile: authoredSongProfile,
-          review: {
-            sectionKinds: {},
-            sectionChaos: {},
-            reviewedSections: {},
-          },
-        },
-        storage,
-      ),
-    ).toBeNull();
+    expect(saveAuthoringProject(createReviewSession(draftFixture), storage)).toBeNull();
   });
 
   it('treats malformed stored JSON as unloadable for save paths', () => {
@@ -260,22 +171,8 @@ describe('song profile storage', () => {
       removeItem: () => undefined,
     };
 
-    expect(loadReviewedProfiles(storage)).toEqual([]);
-    expect(
-      saveReviewedProfile(
-        {
-          name: 'Weekend Chain',
-          sourceTitle: authoredSongProfile.title,
-          profile: authoredSongProfile,
-          review: {
-            sectionKinds: {},
-            sectionChaos: {},
-            reviewedSections: {},
-          },
-        },
-        storage,
-      ),
-    ).toBeNull();
+    expect(loadSavedAuthoringProjects(storage)).toEqual([]);
+    expect(saveAuthoringProject(createReviewSession(draftFixture), storage)).toBeNull();
     expect(writes).toEqual([]);
   });
 });

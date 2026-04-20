@@ -149,6 +149,13 @@ function buildOverridesFromOverlay(session: Pick<ReviewSession, 'draft' | 'overl
   };
 }
 
+export function deriveReviewStateFromOverlay(
+  draft: AnalysisDraft | ReviewSession['draft'],
+  overlay: ReviewSession['overlay'],
+): ReviewedProfileReviewState {
+  return buildOverridesFromOverlay({ draft: toReviewDraft(draft), overlay });
+}
+
 function withUpdatedOverlay(
   session: ReviewSession,
   overlay: ReviewSession['overlay'],

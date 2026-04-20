@@ -1,4 +1,16 @@
-import { validateSongProfile, type SectionKind, type SongProfile } from '../domain/song-profile';
+import { createAnalysisDraft, type AnalysisDraft } from '../domain/analysis-draft';
+import {
+  validateSongProfile,
+  type ImpactStrength,
+  type SectionKind,
+  type SongProfile,
+} from '../domain/song-profile';
+import {
+  buildPlayableProfile,
+  createReviewSession,
+  deriveReviewStateFromOverlay,
+  type ReviewSession,
+} from '../review/review-session';
 
 export interface ReviewedProfileReviewState {
   sectionKinds: Record<number, SectionKind>;
@@ -18,13 +30,26 @@ export interface ReviewedProfileRecord extends ReviewedProfileDraft {
   savedAt: string;
 }
 
+export interface SavedAuthoringProjectRecord {
+  id: string;
+  name: string;
+  sourceTitle: string;
+  savedAt: string;
+  draft: AnalysisDraft;
+  overlay: ReviewSession['overlay'];
+  profile: ReviewSession['draft']['profile'];
+  requiresAudioRelink: boolean;
+  review: ReviewedProfileReviewState;
+}
+
 export interface StorageLike {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
   removeItem(key: string): void;
 }
 
-const storageKey = 'pit-game.reviewed-profiles.v1';
+const storageKey = 'pit-game.authoring-projects.v2';
+const legacyStorageKey = 'pit-game.reviewed-profiles.v1';
 const validSectionKinds = new Set<SectionKind>([
   'gather',
   'push',
@@ -33,9 +58,14 @@ const validSectionKinds = new Set<SectionKind>([
   'breakdown',
   'recovery',
 ]);
+const validImpactStrengths = new Set<ImpactStrength>(['accent', 'drop', 'hit', 'stop']);
 
 function isValidSectionKind(value: unknown): value is SectionKind {
   return validSectionKinds.has(value as SectionKind);
+}
+
+function isValidImpactStrength(value: unknown): value is ImpactStrength {
+  return validImpactStrengths.has(value as ImpactStrength);
 }
 
 function getBrowserStorage(): StorageLike | null {
@@ -59,7 +89,7 @@ function createId(): string {
     return crypto.randomUUID();
   }
 
-  return `reviewed-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return `authoring-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 function isRecordLike(value: unknown): value is Record<string, unknown> {
@@ -82,6 +112,10 @@ function clampChaos(value: number): number {
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
+}
+
+function normalizeStringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
 }
 
 function normalizeReviewState(value: unknown): ReviewedProfileReviewState | null {
@@ -109,7 +143,7 @@ function normalizeReviewState(value: unknown): ReviewedProfileReviewState | null
   for (const [key, chaos] of Object.entries(rawSectionChaos)) {
     const indexKey = toIndexKey(key);
 
-    if (indexKey === null || typeof chaos !== 'number' || !Number.isFinite(chaos)) {
+    if (indexKey === null || !isFiniteNumber(chaos)) {
       continue;
     }
 
@@ -176,7 +210,7 @@ function normalizeProfile(value: unknown): SongProfile | null {
       (impact) =>
         isRecordLike(impact) &&
         isFiniteNumber(impact.atMs) &&
-        (impact.strength === 'accent' || impact.strength === 'drop'),
+        isValidImpactStrength(impact.strength),
     )
   ) {
     return null;
@@ -194,7 +228,180 @@ function normalizeProfile(value: unknown): SongProfile | null {
   return profile as SongProfile;
 }
 
-function normalizeRecord(value: unknown): ReviewedProfileRecord | null {
+function normalizeAnalysisDraft(value: unknown): AnalysisDraft | null {
+  if (!isRecordLike(value)) {
+    return null;
+  }
+
+  const profile = normalizeProfile(value.profile);
+
+  if (!profile || typeof value.id !== 'string' || typeof value.sourceTitle !== 'string') {
+    return null;
+  }
+
+  const sectionSuggestions = Array.isArray(value.sectionSuggestions)
+    ? value.sectionSuggestions
+        .filter((suggestion): suggestion is AnalysisDraft['sectionSuggestions'][number] => {
+          return (
+            isRecordLike(suggestion) &&
+            isFiniteNumber(suggestion.index) &&
+            suggestion.index >= 0 &&
+            isFiniteNumber(suggestion.confidence) &&
+            Array.isArray(suggestion.reasons) &&
+            suggestion.reasons.every((reason) => typeof reason === 'string')
+          );
+        })
+        .map((suggestion) => ({
+          index: suggestion.index,
+          confidence: suggestion.confidence,
+          reasons: [...suggestion.reasons],
+        }))
+    : [];
+
+  const impactCandidates = Array.isArray(value.impactCandidates)
+    ? value.impactCandidates
+        .filter((candidate): candidate is AnalysisDraft['impactCandidates'][number] => {
+          return (
+            isRecordLike(candidate) &&
+            isFiniteNumber(candidate.atMs) &&
+            isValidImpactStrength(candidate.strength) &&
+            isFiniteNumber(candidate.confidence) &&
+            Array.isArray(candidate.reasons) &&
+            candidate.reasons.every((reason) => typeof reason === 'string')
+          );
+        })
+        .map((candidate) => ({
+          atMs: candidate.atMs,
+          strength: candidate.strength,
+          confidence: candidate.confidence,
+          reasons: [...candidate.reasons],
+        }))
+    : [];
+
+  return createAnalysisDraft({
+    id: value.id,
+    sourceTitle: value.sourceTitle,
+    profile,
+    sectionSuggestions,
+    impactCandidates,
+    warnings: normalizeStringList(value.warnings),
+  });
+}
+
+function normalizeOverlay(
+  value: unknown,
+  draft: AnalysisDraft,
+): ReviewSession['overlay'] | null {
+  if (!isRecordLike(value) || !Array.isArray(value.sections) || !Array.isArray(value.impacts)) {
+    return null;
+  }
+
+  const sections = value.sections
+    .filter((section): section is ReviewSession['overlay']['sections'][number] => {
+      return (
+        isRecordLike(section) &&
+        isValidSectionKind(section.kind) &&
+        isFiniteNumber(section.startMs) &&
+        isFiniteNumber(section.endMs) &&
+        isFiniteNumber(section.confidence) &&
+        isFiniteNumber(section.chaos) &&
+        (section.reviewState === 'suggested' ||
+          section.reviewState === 'accepted' ||
+          section.reviewState === 'modified' ||
+          section.reviewState === 'user-added') &&
+        (section.sourceIndex === null || (isFiniteNumber(section.sourceIndex) && section.sourceIndex >= 0))
+      );
+    })
+    .map((section) => ({
+      kind: section.kind,
+      startMs: section.startMs,
+      endMs: section.endMs,
+      confidence: section.confidence,
+      chaos: section.chaos,
+      reviewState: section.reviewState,
+      sourceIndex: section.sourceIndex,
+    }));
+
+  const impacts = value.impacts
+    .filter((impact): impact is ReviewSession['overlay']['impacts'][number] => {
+      return (
+        isRecordLike(impact) &&
+        isFiniteNumber(impact.atMs) &&
+        isValidImpactStrength(impact.strength) &&
+        (impact.reviewState === 'suggested' ||
+          impact.reviewState === 'accepted' ||
+          impact.reviewState === 'modified' ||
+          impact.reviewState === 'user-added') &&
+        (impact.source === 'profile' || impact.source === 'candidate' || impact.source === 'user')
+      );
+    })
+    .map((impact) => ({
+      atMs: impact.atMs,
+      strength: impact.strength,
+      reviewState: impact.reviewState,
+      source: impact.source,
+    }));
+
+  if (sections.length !== value.sections.length || impacts.length !== value.impacts.length) {
+    return null;
+  }
+
+  const session = {
+    draft,
+    overlay: { sections, impacts },
+  };
+  const profile = buildPlayableProfile({
+    ...createReviewSession(draft),
+    overlay: session.overlay,
+  });
+
+  if (validateSongProfile(profile).length > 0) {
+    return null;
+  }
+
+  return session.overlay;
+}
+
+function normalizeSavedAuthoringProject(value: unknown): SavedAuthoringProjectRecord | null {
+  if (!isRecordLike(value)) {
+    return null;
+  }
+
+  const draft = normalizeAnalysisDraft(value.draft);
+
+  if (
+    !draft ||
+    typeof value.id !== 'string' ||
+    typeof value.name !== 'string' ||
+    typeof value.sourceTitle !== 'string' ||
+    typeof value.savedAt !== 'string'
+  ) {
+    return null;
+  }
+
+  const overlay = normalizeOverlay(value.overlay, draft);
+  const profile = normalizeProfile(value.profile);
+
+  if (!overlay || !profile) {
+    return null;
+  }
+
+  const review = deriveReviewStateFromOverlay(draft, overlay);
+
+  return {
+    id: value.id,
+    name: value.name,
+    sourceTitle: value.sourceTitle,
+    savedAt: value.savedAt,
+    draft,
+    overlay,
+    profile,
+    requiresAudioRelink: value.requiresAudioRelink !== false,
+    review,
+  };
+}
+
+function normalizeLegacyReviewedProfile(value: unknown): ReviewedProfileRecord | null {
   if (!isRecordLike(value)) {
     return null;
   }
@@ -220,7 +427,7 @@ function normalizeRecord(value: unknown): ReviewedProfileRecord | null {
   };
 }
 
-function readReviewedProfileRecords(storage: StorageLike | null): ReviewedProfileRecord[] | null {
+function readArrayFromStorage(storage: StorageLike | null, key: string): unknown[] | null {
   if (!storage) {
     return [];
   }
@@ -228,7 +435,7 @@ function readReviewedProfileRecords(storage: StorageLike | null): ReviewedProfil
   let raw: string | null;
 
   try {
-    raw = storage.getItem(storageKey);
+    raw = storage.getItem(key);
   } catch {
     return null;
   }
@@ -239,17 +446,16 @@ function readReviewedProfileRecords(storage: StorageLike | null): ReviewedProfil
 
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed.map(normalizeRecord).filter((record): record is ReviewedProfileRecord => record !== null);
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
     return null;
   }
 }
 
-function writeReviewedProfileRecords(storage: StorageLike | null, records: ReviewedProfileRecord[]): boolean {
+function writeSavedAuthoringProjects(
+  storage: StorageLike | null,
+  records: SavedAuthoringProjectRecord[],
+): boolean {
   if (!storage) {
     return false;
   }
@@ -262,53 +468,174 @@ function writeReviewedProfileRecords(storage: StorageLike | null, records: Revie
   }
 }
 
-export function loadReviewedProfiles(storage?: StorageLike | null): ReviewedProfileRecord[] {
-  return (readReviewedProfileRecords(resolveStorage(storage)) ?? []).sort((left, right) =>
+function migrateLegacyRecord(record: ReviewedProfileRecord): SavedAuthoringProjectRecord {
+  const draft = createAnalysisDraft({
+    id: record.profile.id,
+    sourceTitle: record.sourceTitle,
+    profile: record.profile,
+    sectionSuggestions: [],
+    impactCandidates: [],
+    warnings: [],
+  });
+  const session = createReviewSession(record.profile, record.name, record.review);
+
+  return {
+    id: record.id,
+    name: record.name,
+    sourceTitle: record.sourceTitle,
+    savedAt: record.savedAt,
+    draft,
+    overlay: session.overlay,
+    profile: record.profile,
+    requiresAudioRelink: true,
+    review: record.review,
+  };
+}
+
+function readLegacyReviewedProfiles(storage: StorageLike | null): ReviewedProfileRecord[] | null {
+  const parsed = readArrayFromStorage(storage, legacyStorageKey);
+
+  if (parsed === null) {
+    return null;
+  }
+
+  return parsed
+    .map(normalizeLegacyReviewedProfile)
+    .filter((record): record is ReviewedProfileRecord => record !== null);
+}
+
+function readSavedAuthoringProjects(storage: StorageLike | null): SavedAuthoringProjectRecord[] | null {
+  const parsed = readArrayFromStorage(storage, storageKey);
+
+  if (parsed === null) {
+    return null;
+  }
+
+  if (parsed.length > 0) {
+    return parsed
+      .map(normalizeSavedAuthoringProject)
+      .filter((record): record is SavedAuthoringProjectRecord => record !== null);
+  }
+
+  const legacy = readLegacyReviewedProfiles(storage);
+
+  if (legacy === null) {
+    return null;
+  }
+
+  return legacy.map(migrateLegacyRecord);
+}
+
+export function loadSavedAuthoringProjects(storage?: StorageLike | null): SavedAuthoringProjectRecord[] {
+  return (readSavedAuthoringProjects(resolveStorage(storage)) ?? []).sort((left, right) =>
     right.savedAt.localeCompare(left.savedAt),
   );
 }
 
-export function saveReviewedProfile(
-  draft: ReviewedProfileDraft,
+export function saveAuthoringProject(
+  session: ReviewSession,
   storage?: StorageLike | null,
-): ReviewedProfileRecord | null {
+): SavedAuthoringProjectRecord | null {
   const resolvedStorage = resolveStorage(storage);
-  const existingRecords = readReviewedProfileRecords(resolvedStorage);
+  const existing = readSavedAuthoringProjects(resolvedStorage);
 
-  if (existingRecords === null) {
+  if (existing === null) {
     return null;
   }
 
-  const name = draft.name.trim() || draft.profile.title || draft.sourceTitle;
-  const record: ReviewedProfileRecord = {
-    ...draft,
+  const record: SavedAuthoringProjectRecord = {
     id: createId(),
-    name,
+    name: session.name.trim() || session.draft.profile.title,
+    sourceTitle: session.draft.sourceTitle,
     savedAt: new Date().toISOString(),
+    draft: session.draft,
+    overlay: {
+      sections: session.overlay.sections.map((section) => ({ ...section })),
+      impacts: session.overlay.impacts.map((impact) => ({ ...impact })),
+    },
+    profile: buildPlayableProfile(session),
+    requiresAudioRelink: true,
+    review: deriveReviewStateFromOverlay(session.draft, session.overlay),
   };
-  const next = [record, ...existingRecords];
 
-  if (!writeReviewedProfileRecords(resolvedStorage, next)) {
+  if (!writeSavedAuthoringProjects(resolvedStorage, [record, ...existing])) {
     return null;
   }
 
   return record;
 }
 
+export function hydrateSavedAuthoringProject(
+  record: SavedAuthoringProjectRecord,
+  audioSource: ReviewSession['audioSource'] = null,
+): ReviewSession {
+  return {
+    ...createReviewSession(record.draft, audioSource ?? undefined),
+    name: record.name,
+    overlay: {
+      sections: record.overlay.sections.map((section) => ({ ...section })),
+      impacts: record.overlay.impacts.map((impact) => ({ ...impact })),
+    },
+    overrides: deriveReviewStateFromOverlay(record.draft, record.overlay),
+    audioSource,
+  };
+}
+
+export function loadReviewedProfiles(storage?: StorageLike | null): ReviewedProfileRecord[] {
+  return loadSavedAuthoringProjects(storage).map((record) => ({
+    id: record.id,
+    name: record.name,
+    sourceTitle: record.sourceTitle,
+    savedAt: record.savedAt,
+    profile: record.profile,
+    review: record.review,
+  }));
+}
+
+export function saveReviewedProfile(
+  draft: ReviewedProfileDraft,
+  storage?: StorageLike | null,
+): ReviewedProfileRecord | null {
+  const session = createReviewSession(draft.profile, draft.name, draft.review);
+  const saved = saveAuthoringProject(
+    {
+      ...session,
+      draft: {
+        ...session.draft,
+        sourceTitle: draft.sourceTitle,
+      },
+      name: draft.name.trim() || draft.profile.title || draft.sourceTitle,
+    },
+    storage,
+  );
+
+  if (!saved) {
+    return null;
+  }
+
+  return {
+    id: saved.id,
+    name: saved.name,
+    sourceTitle: saved.sourceTitle,
+    savedAt: saved.savedAt,
+    profile: saved.profile,
+    review: saved.review,
+  };
+}
+
 export function deleteReviewedProfile(id: string, storage?: StorageLike | null): boolean {
   const resolvedStorage = resolveStorage(storage);
-  const current = readReviewedProfileRecords(resolvedStorage);
+  const current = readSavedAuthoringProjects(resolvedStorage);
 
   if (current === null) {
     return false;
   }
 
   const next = current.filter((record) => record.id !== id);
-  const removed = next.length !== current.length;
 
-  if (removed) {
-    return writeReviewedProfileRecords(resolvedStorage, next);
+  if (next.length === current.length) {
+    return false;
   }
 
-  return false;
+  return writeSavedAuthoringProjects(resolvedStorage, next);
 }
