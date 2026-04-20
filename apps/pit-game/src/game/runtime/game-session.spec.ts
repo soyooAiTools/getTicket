@@ -23,4 +23,20 @@ describe('game session', () => {
     expect(session.crowd.center.density).toBe(0.88);
     expect(session.crowd.edge.density).toBe(0.48);
   });
+
+  it('splits a step across a section boundary consistently', () => {
+    const startMs = 58_000;
+
+    let combined = createGameSession(authoredSongProfile, startMs);
+    combined = stepGameSession(combined, { action: 'brace', targetZone: 'center' }, 2_000);
+
+    let split = createGameSession(authoredSongProfile, startMs);
+    split = stepGameSession(split, { action: 'brace', targetZone: 'center' }, 500);
+    split = stepGameSession(split, { action: 'brace', targetZone: 'center' }, 1_500);
+
+    expect(combined.elapsedMs).toBe(split.elapsedMs);
+    expect(combined.currentMission).toBe(split.currentMission);
+    expect(combined.player.balance).toBeCloseTo(split.player.balance, 6);
+    expect(combined.crowd.fallenFans).toBeCloseTo(split.crowd.fallenFans, 6);
+  });
 });
