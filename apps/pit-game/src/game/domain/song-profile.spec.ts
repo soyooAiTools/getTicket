@@ -41,4 +41,51 @@ describe('song profile', () => {
 
     expect(errors).toEqual([]);
   });
+
+  it('rejects profiles whose first section does not start at zero', () => {
+    const errors = validateSongProfile({
+      ...authoredSongProfile,
+      sections: [
+        { ...authoredSongProfile.sections[0]!, startMs: 500 },
+        ...authoredSongProfile.sections.slice(1),
+      ],
+    });
+
+    expect(errors).toContain('first section must start at 0');
+  });
+
+  it('rejects gaps and incomplete coverage at the end of the song', () => {
+    const errors = validateSongProfile({
+      ...authoredSongProfile,
+      sections: [
+        { ...authoredSongProfile.sections[0]!, endMs: 11_500 },
+        { ...authoredSongProfile.sections[1]!, startMs: 12_000 },
+        ...authoredSongProfile.sections.slice(2, -1),
+        {
+          ...authoredSongProfile.sections[authoredSongProfile.sections.length - 1]!,
+          endMs: authoredSongProfile.durationMs - 1_000,
+        },
+      ],
+    });
+
+    expect(errors).toContain('section 1 does not start when section 0 ends');
+    expect(errors).toContain('last section must end at the song duration');
+  });
+
+  it('rejects sections that extend outside the song duration', () => {
+    const errors = validateSongProfile({
+      ...authoredSongProfile,
+      sections: [
+        { ...authoredSongProfile.sections[0]!, startMs: -250 },
+        ...authoredSongProfile.sections.slice(1, -1),
+        {
+          ...authoredSongProfile.sections[authoredSongProfile.sections.length - 1]!,
+          endMs: authoredSongProfile.durationMs + 250,
+        },
+      ],
+    });
+
+    expect(errors).toContain('section 0 starts outside the song duration');
+    expect(errors).toContain(`section ${authoredSongProfile.sections.length - 1} ends outside the song duration`);
+  });
 });

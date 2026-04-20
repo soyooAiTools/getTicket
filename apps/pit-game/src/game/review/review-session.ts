@@ -327,6 +327,29 @@ export function addImpactMarker(
   });
 }
 
+export function setImpactStrength(
+  session: ReviewSession,
+  index: number,
+  strength: ImpactStrength,
+): ReviewSession {
+  const impacts = session.overlay.impacts.map<AuthoredImpact>((impact, impactIndex) => {
+    if (impactIndex !== index) {
+      return cloneImpact(impact);
+    }
+
+    return {
+      ...impact,
+      strength,
+      reviewState: impact.reviewState === 'user-added' ? 'user-added' : 'modified',
+    };
+  });
+
+  return withUpdatedOverlay(session, {
+    ...session.overlay,
+    impacts,
+  });
+}
+
 export function getAuthoringWarnings(session: ReviewSession): string[] {
   const warnings: string[] = [];
 

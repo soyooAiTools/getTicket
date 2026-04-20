@@ -47,9 +47,9 @@ const draftFixture = createAnalysisDraft({
     ],
     impacts: [{ atMs: 8_000, strength: 'drop' }],
   },
-  sectionSuggestions: [],
+  sectionSuggestions: [{ index: 1, confidence: 0.62, reasons: ['peak energy bucket'] }],
   impactCandidates: [{ atMs: 7_875, strength: 'hit', confidence: 0.77, reasons: ['transient cluster'] }],
-  warnings: [],
+  warnings: ['low-confidence section 1'],
 });
 
 describe('saved authoring projects', () => {
@@ -60,6 +60,9 @@ describe('saved authoring projects', () => {
     const record = saveAuthoringProject(session, storage);
 
     expect(record?.draft.sourceTitle).toBe('Fan Edit');
+    expect(record?.draft.sectionSuggestions).toEqual(draftFixture.sectionSuggestions);
+    expect(record?.draft.impactCandidates).toEqual(draftFixture.impactCandidates);
+    expect(record?.draft.warnings).toEqual(draftFixture.warnings);
     expect(record?.overlay.sections).toHaveLength(3);
     expect(loadSavedAuthoringProjects(storage)[0]?.requiresAudioRelink).toBe(true);
   });
@@ -131,6 +134,31 @@ describe('saved authoring projects', () => {
         requiresAudioRelink: true,
       }),
     ]);
+    expect(storage.getItem('pit-game.reviewed-profiles.v1')).toBeNull();
+  });
+
+  it('does not resurrect deleted migrated projects from the legacy key on later loads', () => {
+    const storage = createMemoryStorage();
+
+    storage.setItem(
+      'pit-game.reviewed-profiles.v1',
+      JSON.stringify([
+        {
+          id: 'legacy',
+          name: 'Legacy',
+          sourceTitle: 'Legacy',
+          savedAt: '2026-04-20T00:00:00.000Z',
+          profile: draftFixture.profile,
+          review: { sectionKinds: {}, sectionChaos: {}, reviewedSections: {} },
+        },
+      ]),
+    );
+
+    const migrated = loadSavedAuthoringProjects(storage);
+
+    expect(migrated[0]?.id).toBe('legacy');
+    expect(deleteReviewedProfile('legacy', storage)).toBe(true);
+    expect(loadSavedAuthoringProjects(storage)).toEqual([]);
   });
 
   it('keeps the reviewed-profile compatibility facade working through v2 storage', () => {
@@ -205,5 +233,45 @@ describe('saved authoring projects', () => {
     expect(loadSavedAuthoringProjects(storage)).toEqual([]);
     expect(saveAuthoringProject(createReviewSession(draftFixture), storage)).toBeNull();
     expect(writes).toEqual([]);
+  });
+
+  it('rejects saved authoring projects whose sections leave uncovered gaps', () => {
+    const storage = createMemoryStorage();
+
+    storage.setItem(
+      'pit-game.authoring-projects.v2',
+      JSON.stringify([
+        {
+          id: 'gap-project',
+          name: 'Gap Project',
+          sourceTitle: draftFixture.sourceTitle,
+          savedAt: '2026-04-20T00:00:00.000Z',
+          draft: {
+            ...draftFixture,
+            profile: {
+              ...draftFixture.profile,
+              sections: [
+                { ...draftFixture.profile.sections[0]!, endMs: 7_500 },
+                { ...draftFixture.profile.sections[1]!, startMs: 8_000 },
+                ...draftFixture.profile.sections.slice(2),
+              ],
+            },
+          },
+          overlay: createReviewSession(draftFixture).overlay,
+          profile: {
+            ...draftFixture.profile,
+            sections: [
+              { ...draftFixture.profile.sections[0]!, endMs: 7_500 },
+              { ...draftFixture.profile.sections[1]!, startMs: 8_000 },
+              ...draftFixture.profile.sections.slice(2),
+            ],
+          },
+          requiresAudioRelink: true,
+          review: { sectionKinds: {}, sectionChaos: {}, reviewedSections: {} },
+        },
+      ]),
+    );
+
+    expect(loadSavedAuthoringProjects(storage)).toEqual([]);
   });
 });

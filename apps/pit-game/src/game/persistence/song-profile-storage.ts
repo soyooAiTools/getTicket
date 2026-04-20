@@ -468,6 +468,19 @@ function writeSavedAuthoringProjects(
   }
 }
 
+function clearLegacyReviewedProfiles(storage: StorageLike | null): boolean {
+  if (!storage) {
+    return false;
+  }
+
+  try {
+    storage.removeItem(legacyStorageKey);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function migrateLegacyRecord(record: ReviewedProfileRecord): SavedAuthoringProjectRecord {
   const draft = createAnalysisDraft({
     id: record.profile.id,
@@ -530,6 +543,10 @@ function readSavedAuthoringProjects(storage: StorageLike | null): SavedAuthoring
   }
 
   if (!writeSavedAuthoringProjects(storage, migrated)) {
+    return null;
+  }
+
+  if (!clearLegacyReviewedProfiles(storage)) {
     return null;
   }
 

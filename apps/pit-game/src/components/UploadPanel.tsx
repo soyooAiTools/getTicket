@@ -1,11 +1,12 @@
 import { useState } from 'react';
 
-import { buildValidatedDraftSongProfile } from '../game/analysis/draft-song-profile';
+import { buildAnalysisDraft } from '../game/analysis/draft-song-profile';
 import { decodeAudioFile } from '../game/analysis/decode-audio-file';
-import type { SongProfile } from '../game/domain/song-profile';
+import type { AnalysisDraft } from '../game/domain/analysis-draft';
+import { validateSongProfile } from '../game/domain/song-profile';
 
 interface UploadPanelProps {
-  onDraftReady(profile: SongProfile): void;
+  onDraftReady(draft: AnalysisDraft, audioSource: { name: string; objectUrl: string }): void;
 }
 
 export function UploadPanel({ onDraftReady }: UploadPanelProps) {
@@ -30,7 +31,17 @@ export function UploadPanel({ onDraftReady }: UploadPanelProps) {
             try {
               setStatus(`Analyzing ${file.name}...`);
               const analysis = await decodeAudioFile(file);
-              onDraftReady(buildValidatedDraftSongProfile(analysis));
+              const draft = buildAnalysisDraft(analysis);
+              const [validationError] = validateSongProfile(draft.profile);
+
+              if (validationError) {
+                throw new Error(validationError);
+              }
+
+              onDraftReady(draft, {
+                name: file.name,
+                objectUrl: URL.createObjectURL(file),
+              });
               setStatus(`Draft ready for ${analysis.title}`);
             } catch (error) {
               const message =

@@ -49,6 +49,17 @@ describe('runtime controller', () => {
     expect(controller.getSnapshot().elapsedMs).toBe(7_250);
   });
 
+  it('stops stepping at the preview window end instead of running to the song end', () => {
+    const controller = createRuntimeController(authoredSongProfile);
+
+    controller.reset(authoredSongProfile, 7_250, 8_000);
+    controller.step({ action: 'brace', targetZone: 'center' }, 2_000);
+
+    expect(controller.getSnapshot().elapsedMs).toBe(7_999);
+    expect(controller.getSnapshot().completed).toBe(false);
+    expect(controller.getSnapshot().result).toBeNull();
+  });
+
   it('publishes a result when the run ends and stops stepping afterward', () => {
     const controller = createRuntimeController(authoredSongProfile, authoredSongProfile.durationMs - 1_000);
 

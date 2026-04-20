@@ -81,6 +81,125 @@ body {
   margin-top: 16px;
 }
 
+.review-panel-shell,
+.review-panel-header,
+.review-panel-grid,
+.review-sidebar,
+.review-inspector,
+.review-selection-copy,
+.timeline-editor,
+.timeline-header,
+.timeline-lane-group,
+.timeline-lane-copy,
+.preview-panel,
+.preview-panel-copy,
+.preview-actions,
+.preview-audio-warning,
+.preview-audio-player {
+  display: grid;
+  gap: 12px;
+}
+
+.review-panel-header {
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
+  align-items: start;
+}
+
+.review-panel-grid {
+  grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr);
+  align-items: start;
+}
+
+.timeline-header {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.timeline-header h3,
+.review-inspector h3,
+.preview-panel h3 {
+  margin: 0;
+}
+
+.timeline-header p,
+.preview-panel-copy p,
+.preview-audio-warning p,
+.review-selection-copy p {
+  margin: 0;
+  color: #d9c7b6;
+  line-height: 1.45;
+}
+
+.timeline-lane-label,
+.preview-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #f2d39a;
+}
+
+.timeline-sections,
+.timeline-impacts {
+  position: relative;
+  min-height: 82px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(10, 7, 7, 0.58);
+  overflow: hidden;
+}
+
+.timeline-impacts {
+  min-height: 58px;
+}
+
+.timeline-section-chip,
+.timeline-impact-chip {
+  position: absolute;
+  top: 10px;
+  min-height: 60px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background:
+    linear-gradient(180deg, rgba(85, 30, 19, 0.92), rgba(38, 15, 12, 0.88));
+  color: inherit;
+  text-align: left;
+}
+
+.timeline-section-chip {
+  display: grid;
+  gap: 4px;
+  min-width: 92px;
+}
+
+.timeline-section-chip small {
+  color: #d9c7b6;
+}
+
+.timeline-section-chip.is-selected,
+.timeline-impact-chip.is-selected {
+  border-color: rgba(243, 195, 131, 0.62);
+  box-shadow: inset 0 0 0 1px rgba(243, 195, 131, 0.26);
+}
+
+.timeline-impact-chip {
+  top: 12px;
+  min-height: 34px;
+  min-width: 72px;
+  transform: translateX(-50%);
+  background:
+    linear-gradient(180deg, rgba(94, 46, 18, 0.92), rgba(37, 18, 10, 0.88));
+  justify-content: center;
+}
+
+.preview-audio-status {
+  margin: 0;
+  color: #d9c7b6;
+}
+
+.preview-audio-player audio {
+  width: 100%;
+  filter: saturate(0.85) sepia(0.12);
+}
+
 .profile-library {
   display: grid;
   gap: 16px;
@@ -375,5 +494,10 @@ input {
 
   .hud {
     position: static;
+  }
+
+   .review-panel-header,
+   .review-panel-grid {
+    grid-template-columns: 1fr;
   }
 }

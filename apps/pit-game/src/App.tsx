@@ -39,13 +39,21 @@ export function App() {
   const [libraryRevision, setLibraryRevision] = useState(0);
   const [reviewSaveMessage, setReviewSaveMessage] = useState<string | null>(null);
 
-  const applyRuntimeProfile = (profile: SongProfile) => {
-    controller.reset(profile);
+  const applyRuntimeProfile = (profile: SongProfile, elapsedMs = 0, previewEndMs: number | null = null) => {
+    controller.reset(profile, elapsedMs, previewEndMs);
     const nextSession = controller.getSnapshot();
     latestSessionRef.current = nextSession;
     startTransition(() => {
       setSession(nextSession);
     });
+  };
+
+  const replaceOwnedAudioUrl = (nextUrl: string | null) => {
+    if (ownedAudioUrlRef.current && ownedAudioUrlRef.current !== nextUrl) {
+      URL.revokeObjectURL(ownedAudioUrlRef.current);
+    }
+
+    ownedAudioUrlRef.current = nextUrl;
   };
 
   useEffect(() => {
@@ -120,8 +128,9 @@ export function App() {
     <main className={`runtime-shell${session.result ? ' has-result' : ''}`}>
       <div className='control-column'>
         <UploadPanel
-          onDraftReady={(draftProfile) => {
-            setReviewSession(createReviewSession(draftProfile));
+          onDraftReady={(draft, audioSource) => {
+            replaceOwnedAudioUrl(audioSource.objectUrl);
+            setReviewSession(createReviewSession(draft, audioSource));
             setReviewSaveMessage(null);
             setMode('reviewing');
           }}
@@ -136,27 +145,39 @@ export function App() {
             const record = pendingRelinkRecordRef.current;
             const input = event.currentTarget;
 
-            if (!file || !record) {
+            if (!file) {
               input.value = '';
               return;
             }
 
-            if (ownedAudioUrlRef.current) {
-              URL.revokeObjectURL(ownedAudioUrlRef.current);
-            }
-
             const objectUrl = URL.createObjectURL(file);
-            ownedAudioUrlRef.current = objectUrl;
+            replaceOwnedAudioUrl(objectUrl);
             pendingRelinkRecordRef.current = null;
 
-            applyRuntimeProfile(record.profile);
-            setReviewSession(
-              hydrateSavedAuthoringProject(record, {
-                name: file.name,
-                objectUrl,
-              }),
-            );
-            setReviewSaveMessage(`Relinked audio for ${record.name}.`);
+            if (record) {
+              applyRuntimeProfile(record.profile);
+              setReviewSession(
+                hydrateSavedAuthoringProject(record, {
+                  name: file.name,
+                  objectUrl,
+                }),
+              );
+              setReviewSaveMessage(`Relinked audio for ${record.name}.`);
+            } else {
+              setReviewSession((current) =>
+                current
+                  ? {
+                      ...current,
+                      audioSource: {
+                        name: file.name,
+                        objectUrl,
+                  },
+                    }
+                  : current,
+              );
+              setReviewSaveMessage(`Linked local preview audio from ${file.name}.`);
+            }
+
             setMode('reviewing');
             input.value = '';
           }}
@@ -181,6 +202,7 @@ export function App() {
                     type='button'
                     className='form-control'
                     onClick={() => {
+                      replaceOwnedAudioUrl(null);
                       applyRuntimeProfile(sample.profile);
                       setReviewSession(createReviewSession(sample.profile, sample.name));
                       setReviewSaveMessage(`Loaded built-in sample ${sample.name}.`);
@@ -216,19 +238,25 @@ export function App() {
 
             setReviewSaveMessage('Could not save this authoring project in local storage.');
           }}
-          onPlay={(profile) => {
-            controller.reset(profile);
-            latestSessionRef.current = controller.getSnapshot();
-            startTransition(() => {
-              setSession(controller.getSnapshot());
-            });
+          onPreviewPlay={(profile, previewWindow) => {
+            applyRuntimeProfile(profile, previewWindow.startMs, previewWindow.endMs);
             setReviewSaveMessage(null);
-            setMode('playing');
+            setMode('reviewing');
+          }}
+          onPlay={(profile) => {
+            applyRuntimeProfile(profile);
+            setReviewSaveMessage(null);
+            setMode('reviewing');
+          }}
+          onRelinkAudio={() => {
+            pendingRelinkRecordRef.current = null;
+            relinkInputRef.current?.click();
           }}
         />
         <ProfileLibrary
           revision={libraryRevision}
           onLoad={(record) => {
+            replaceOwnedAudioUrl(null);
             applyRuntimeProfile(record.profile);
             setReviewSession(hydrateSavedAuthoringProject(record));
             setReviewSaveMessage(

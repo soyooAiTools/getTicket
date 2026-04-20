@@ -9,6 +9,7 @@ import {
   getAuthoringWarnings,
   mergeSectionForward,
   moveSectionBoundary,
+  setImpactStrength,
   selectImpact,
   selectSection,
   splitSectionAtBeat,
@@ -50,6 +51,13 @@ describe('review session authoring', () => {
 
     expect(withImpact.overlay.impacts.some((item) => item.strength === 'stop')).toBe(true);
     expect(buildPlayableProfile(withImpact).impacts.some((item) => item.strength === 'stop')).toBe(true);
+  });
+
+  it('supports retyping an authored impact marker', () => {
+    const withImpact = addImpactMarker(createReviewSession(draft), { atMs: 11_250, strength: 'stop' });
+    const retyped = setImpactStrength(withImpact, withImpact.overlay.impacts.length - 1, 'accent');
+
+    expect(retyped.overlay.impacts[retyped.overlay.impacts.length - 1]?.strength).toBe('accent');
   });
 
   it('excludes suggested impact candidates from the playable profile until accepted or authored', () => {
