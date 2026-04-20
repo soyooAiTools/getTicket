@@ -27,10 +27,17 @@ describe('minorityThreatVerticalSlice', () => {
     expect(
       minorityThreatVerticalSlice.audio.segmentEndMs - minorityThreatVerticalSlice.audio.segmentStartMs,
     ).toBe(30_000);
-    expect(minorityThreatVerticalSlice.phases.map((phase) => phase.kind)).toEqual([
-      'tension-in',
-      'breakdown-peak',
-      'aftershock',
+    expect(minorityThreatVerticalSlice.phases).toEqual([
+      { kind: 'tension-in', startMs: 0, endMs: 6_000, intensity: 0.44 },
+      { kind: 'breakdown-peak', startMs: 6_000, endMs: 24_000, intensity: 1 },
+      { kind: 'aftershock', startMs: 24_000, endMs: 30_000, intensity: 0.5 },
+    ]);
+    expect(minorityThreatVerticalSlice.events).toEqual([
+      { atMs: 3_000, kind: 'crowd-build', strength: 0.58 },
+      { atMs: 7_500, kind: 'lateral-surge', strength: 0.82 },
+      { atMs: 9_000, kind: 'breakdown-hit', strength: 1 },
+      { atMs: 15_000, kind: 'breakdown-hit', strength: 0.92 },
+      { atMs: 24_000, kind: 'aftershock-drop', strength: 0.64 },
     ]);
     expect(validateVerticalSliceFixture(minorityThreatVerticalSlice)).toEqual([]);
   });
