@@ -25,7 +25,7 @@ export function ReportsPage() {
 
   async function loadReport() {
     if (!baselineRunId || !productionRunId) {
-      setError('Both baseline and production run ids are required.');
+      setError('基线任务和生产校准任务编号不能为空。');
       setLoading(false);
       return;
     }
@@ -39,7 +39,7 @@ export function ReportsPage() {
       setError(
         loadError instanceof Error
           ? loadError.message
-          : 'Unable to load the calibration report.',
+          : '无法加载校准复盘。',
       );
     } finally {
       setLoading(false);
@@ -54,22 +54,23 @@ export function ReportsPage() {
     <Space direction='vertical' size={24} style={{ display: 'flex' }}>
       <div>
         <Typography.Title level={2} style={{ marginBottom: 8 }}>
-          Calibration report
+          校准复盘
         </Typography.Title>
         <Typography.Paragraph style={{ marginBottom: 0 }}>
-          Compare baseline run{' '}
-          <Typography.Text code>{baselineRunId ?? '-'}</Typography.Text> against
-          production run{' '}
-          <Typography.Text code>{productionRunId ?? '-'}</Typography.Text>.
+          对比基线任务{' '}
+          <Typography.Text code>{baselineRunId ?? '-'}</Typography.Text>{' '}
+          与生产校准任务{' '}
+          <Typography.Text code>{productionRunId ?? '-'}</Typography.Text>
+          的结果。
         </Typography.Paragraph>
       </div>
 
       <Space wrap>
         <Button>
-          <Link to='/runs'>Back to runs</Link>
+          <Link to='/runs'>返回任务列表</Link>
         </Button>
         <Button loading={loading} onClick={() => void loadReport()}>
-          Refresh report
+          刷新复盘
         </Button>
       </Space>
 
@@ -77,32 +78,32 @@ export function ReportsPage() {
 
       <Space size={16} style={{ display: 'flex' }} wrap>
         <Card loading={loading}>
-          <Statistic title='Realism score' value={report?.realismScore ?? 0} />
+          <Statistic title='真实性分' value={report?.realismScore ?? 0} />
         </Card>
         <Card loading={loading}>
-          <Statistic title='Capacity score' value={report?.capacityScore ?? 0} />
+          <Statistic title='容量分' value={report?.capacityScore ?? 0} />
         </Card>
         <Card loading={loading}>
-          <Statistic title='Fairness score' value={report?.fairnessScore ?? 0} />
+          <Statistic title='公平性分' value={report?.fairnessScore ?? 0} />
         </Card>
         <Card loading={loading}>
-          <Statistic title='Control score' value={report?.controlScore ?? 0} />
+          <Statistic title='可控性分' value={report?.controlScore ?? 0} />
         </Card>
       </Space>
 
-      <Card loading={loading} title='Recommended updates'>
+      <Card loading={loading} title='建议调整项'>
         <Table
           columns={[
-            { dataIndex: 'field', key: 'field', title: 'Field' },
+            { dataIndex: 'field', key: 'field', title: '字段' },
             {
               dataIndex: 'previousValue',
               key: 'previousValue',
-              title: 'Baseline',
+              title: '基线值',
             },
             {
               dataIndex: 'recommendedValue',
               key: 'recommendedValue',
-              title: 'Recommended',
+              title: '建议值',
             },
           ]}
           dataSource={report?.recommendedUpdates ?? []}

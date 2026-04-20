@@ -34,13 +34,13 @@ export function useRunStream(runId: string | undefined) {
         setError(undefined);
       } catch {
         setState('error');
-        setError('Received an unreadable live telemetry event.');
+        setError('收到无法解析的实时遥测事件。');
       }
     };
 
     source.onerror = () => {
       setState('error');
-      setError('Live telemetry stream disconnected.');
+      setError('实时遥测连接已断开。');
     };
 
     return () => {

@@ -1,20 +1,22 @@
 import { Layout, Menu, Space, Typography } from 'antd';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 
+import { consoleCopy } from '../shared/console-copy';
+
 const { Content, Header, Sider } = Layout;
 
 const navigationItems = [
   {
     key: '/overview',
-    label: <Link to='/overview'>Overview</Link>,
+    label: <Link to='/overview'>{consoleCopy.nav.overview}</Link>,
   },
   {
     key: '/runs',
-    label: <Link to='/runs'>Runs</Link>,
+    label: <Link to='/runs'>{consoleCopy.nav.runs}</Link>,
   },
   {
     key: '/nodes',
-    label: <Link to='/nodes'>Nodes</Link>,
+    label: <Link to='/nodes'>{consoleCopy.nav.nodes}</Link>,
   },
 ];
 
@@ -38,11 +40,10 @@ export function ControlShell() {
       <Sider breakpoint='lg' theme='light' width={232}>
         <div style={{ padding: '24px 20px 16px' }}>
           <Typography.Title level={4} style={{ marginBottom: 8 }}>
-            Load-testing operator console
+            {consoleCopy.shell.sidebarTitle}
           </Typography.Title>
           <Typography.Text type='secondary'>
-            Manage seeded templates, live runs, node pools, and calibration
-            reports.
+            {consoleCopy.shell.sidebarDescription}
           </Typography.Text>
         </div>
         <Menu
@@ -64,11 +65,10 @@ export function ControlShell() {
         >
           <Space direction='vertical' size={2}>
             <Typography.Title level={3} style={{ margin: 0 }}>
-              SaaS control surface
+              {consoleCopy.shell.topTitle}
             </Typography.Title>
             <Typography.Text type='secondary'>
-              Drive load-test planning, monitor live telemetry, and compare
-              rehearsal outcomes without leaving the operator console.
+              {consoleCopy.shell.topDescription}
             </Typography.Text>
           </Space>
         </Header>

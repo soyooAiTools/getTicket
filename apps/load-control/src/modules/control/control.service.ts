@@ -311,6 +311,7 @@ export class ControlService {
       targetBaseUrl: draft.definition.targetBaseUrl,
       status: 'DRAFT',
       tags: draft.definition.tags,
+      ticketTask: draft.definition.ticketTask,
       createdAt: now,
       updatedAt: now,
     };
@@ -325,6 +326,7 @@ export class ControlService {
       targetBaseUrl: run.targetBaseUrl,
       status: run.status,
       tags: run.tags,
+      ticketTask: run.definition.ticketTask,
       createdAt: run.createdAt,
       updatedAt: run.updatedAt,
     };
@@ -341,6 +343,7 @@ export class ControlService {
       targetBaseUrl: run.definition.targetBaseUrl,
       status: run.status,
       tags: run.definition.tags,
+      ticketTask: run.definition.ticketTask,
       createdAt: now,
       updatedAt: now,
     };

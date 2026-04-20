@@ -17,6 +17,7 @@ import {
 import { useEffect, useState } from 'react';
 
 import { listNodePools, listNodes } from '../../services/load-control';
+import { labelNodeRole } from '../../shared/console-copy';
 
 function formatLossRatio(value: number) {
   return `${(value * 100).toFixed(2)}%`;
@@ -44,7 +45,7 @@ export function NodesPage() {
       setError(
         loadError instanceof Error
           ? loadError.message
-          : 'Unable to load node inventory.',
+          : '无法加载节点池信息。',
       );
     } finally {
       setLoading(false);
@@ -59,21 +60,20 @@ export function NodesPage() {
     <Space direction='vertical' size={24} style={{ display: 'flex' }}>
       <div>
         <Typography.Title level={2} style={{ marginBottom: 8 }}>
-          Nodes
+          节点池
         </Typography.Title>
         <Typography.Paragraph style={{ marginBottom: 0 }}>
-          Review seeded node pools and the currently registered runtime nodes
-          that can accept assignments.
+          查看已预置的节点池和当前注册的执行节点，确认区域、角色和可用并发。
         </Typography.Paragraph>
       </div>
 
       {error ? <Alert message={error} showIcon type='error' /> : null}
 
       <Button loading={loading} onClick={() => void loadNodeInventory()}>
-        Refresh
+        刷新节点状态
       </Button>
 
-      <Card title='Seeded node pools'>
+      <Card title='已预置节点池'>
         <Row gutter={[16, 16]}>
           {nodePools.map((pool) => (
             <Col key={pool.id} span={12}>
@@ -82,11 +82,11 @@ export function NodesPage() {
                   <Typography.Text strong>{pool.name}</Typography.Text>
                   <Space wrap>
                     <Tag>{pool.region}</Tag>
-                    <Tag>{pool.role}</Tag>
-                    <Tag>{pool.maxNodes} max nodes</Tag>
+                    <Tag>{labelNodeRole(pool.role)}</Tag>
+                    <Tag>{pool.maxNodes} 台上限</Tag>
                   </Space>
                   <Typography.Text type='secondary'>
-                    Nodes: {pool.nodeIds.length ? pool.nodeIds.join(', ') : 'seed only'}
+                    节点: {pool.nodeIds.length ? pool.nodeIds.join(', ') : '仅预置资源'}
                   </Typography.Text>
                 </Space>
               </Card>
@@ -95,21 +95,26 @@ export function NodesPage() {
         </Row>
       </Card>
 
-      <Card title='Registered nodes'>
+      <Card title='已注册节点'>
         <Table<NodeRegistration>
           columns={[
-            { dataIndex: 'id', key: 'id', title: 'Node id' },
-            { dataIndex: 'region', key: 'region', title: 'Region' },
-            { dataIndex: 'role', key: 'role', title: 'Role' },
+            { dataIndex: 'id', key: 'id', title: '节点编号' },
+            { dataIndex: 'region', key: 'region', title: '区域' },
+            {
+              dataIndex: 'role',
+              key: 'role',
+              title: '角色',
+              render: (value: NodeRegistration['role']) => labelNodeRole(value),
+            },
             {
               key: 'networkProfile',
-              title: 'Network profile',
+              title: '网络画像',
               render: (_value: unknown, record) => (
                 <Space direction='vertical' size={0}>
                   <Typography.Text>{record.networkProfile.label}</Typography.Text>
                   <Typography.Text type='secondary'>
-                    Base {record.networkProfile.baseLatencyMs} ms / jitter{' '}
-                    {record.networkProfile.jitterMs} ms / loss{' '}
+                    基线 {record.networkProfile.baseLatencyMs} ms / 抖动{' '}
+                    {record.networkProfile.jitterMs} ms / 丢包{' '}
                     {formatLossRatio(record.networkProfile.packetLossRatio)}
                   </Typography.Text>
                 </Space>
@@ -118,7 +123,7 @@ export function NodesPage() {
             {
               dataIndex: 'maxConcurrency',
               key: 'maxConcurrency',
-              title: 'Max concurrency',
+              title: '最大并发',
             },
           ]}
           dataSource={nodes}

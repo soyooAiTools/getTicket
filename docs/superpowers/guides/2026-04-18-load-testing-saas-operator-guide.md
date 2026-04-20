@@ -12,6 +12,15 @@ operations rather than ticketing backoffice work.
 - `/nodes`: review seeded node pools and currently registered nodes.
 - `/reports/:baselineRunId/:productionRunId`: compare two completed runs with a calibration report.
 
+In the current Chinese console copy, these routes map to the operator-facing
+navigation below:
+
+- `/overview`: `作战总览`
+- `/runs`: `抢票任务`
+- `/runs/:runId`: `任务作战台`
+- `/nodes`: `节点池`
+- `/reports/:baselineRunId/:productionRunId`: `校准复盘`
+
 ## Data sources
 
 The console talks directly to the `load-control` runtime API.
@@ -46,6 +55,36 @@ corepack pnpm --filter load-control dev
 corepack pnpm --filter admin dev
 ```
 
+## Local launchers
+
+For this worktree, the quickest local entrypoint is:
+
+```powershell
+.\start-local-stack.cmd
+```
+
+That launcher calls `scripts/start-local-stack.ps1` and will:
+
+- ensure `.env` exists
+- bring up `Postgres` and `Redis` via `docker compose`
+- install dependencies if `node_modules` is missing
+- run Prisma generate/migrate for `api` and `load-control`
+- seed the persisted load-control templates and node pools needed by the SaaS console
+- start `api`, `load-control`, and `admin` as background processes
+
+Companion launchers:
+
+- `stop-local-stack.cmd`
+- `status-local-stack.cmd`
+
+Operational state is stored under `.codex-temp/local-stack`, with per-service stdout/stderr logs under `.codex-temp/local-stack/logs`.
+
+The one-click launcher starts the core SaaS stack only. It does not automatically launch a load agent or demo run. If you want to execute a run end-to-end, register/start an agent separately after the stack is up.
+
+The local SQL seed now also provisions one draft ticket-task demo run:
+`run-local-demo-01`. After startup, you can go straight to `/runs` and inspect
+or plan that seeded task instead of creating everything from scratch.
+
 ## Operator workflow
 
 1. Open `/runs` and create a draft from a seeded template and node pool.
@@ -53,6 +92,28 @@ corepack pnpm --filter admin dev
 3. Start the run and follow `/runs/:runId` for live telemetry.
 4. Stop the run if needed, or wait for summaries to complete.
 5. Compare completed runs under `/reports/:baselineRunId/:productionRunId`.
+
+## Ticket-task workflow
+
+The operator console is now framed as a ticket-testing control surface rather
+than a generic load-test CRUD panel.
+
+Use it like this:
+
+1. Open `/overview` to confirm the stack is healthy and see the latest seeded
+   templates, node pools, and recent ticket tasks.
+2. Open `/runs` and create a task from the grouped sections:
+   `基础参数`, `场次信息`, `票档目标`, `节点策略`, and `执行策略`.
+3. Use the live summary banner at the top of the form to confirm the event,
+   ticket tier, quantity, node pool, and execution objective before saving.
+4. Choose one of the three task actions:
+   `保存任务草稿`, `创建并规划`, or `创建、规划并启动`.
+5. Follow `/runs/:runId` to monitor the `任务作战台`, including the ticket
+   summary card, current phase, node health, telemetry, and summaries.
+
+`/overview` is an operator war room. It is not an end-user ticket checkout
+page. The actual ticket-task creation and execution controls live under
+`/runs`.
 
 ## Verification
 

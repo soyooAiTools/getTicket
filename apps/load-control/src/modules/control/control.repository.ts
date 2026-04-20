@@ -388,9 +388,12 @@ export class ControlRepository {
     targetBaseUrl: string;
     status: RunStatus;
     tags: Prisma.JsonValue;
+    definition?: Prisma.JsonValue;
     createdAt: Date;
     updatedAt: Date;
   }): ControlRunRecord {
+    const definition = this.toRunDefinition(record.definition);
+
     return {
       id: record.id,
       templateId: record.templateId,
@@ -399,6 +402,7 @@ export class ControlRepository {
       targetBaseUrl: record.targetBaseUrl,
       status: record.status,
       tags: this.toStringRecord(record.tags),
+      ticketTask: definition?.ticketTask,
       createdAt: record.createdAt.toISOString(),
       updatedAt: record.updatedAt.toISOString(),
     };
@@ -525,6 +529,14 @@ export class ControlRepository {
 
   private mapSummary(value: Prisma.JsonValue): NodeRunSummary {
     return value as NodeRunSummary;
+  }
+
+  private toRunDefinition(value?: Prisma.JsonValue): LoadTestRunDefinition | undefined {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return undefined;
+    }
+
+    return value as LoadTestRunDefinition;
   }
 
   private toStringRecord(value: Prisma.JsonValue): Record<string, string> {

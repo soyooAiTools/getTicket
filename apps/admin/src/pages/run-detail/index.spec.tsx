@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 import { RunDetailPageView } from './index';
 
 describe('RunDetailPageView', () => {
-  it('renders run metadata, assignments, summaries, and live telemetry', () => {
+  it('renders the ticket-task summary alongside assignments and live telemetry', () => {
     const definition: LoadTestRunDefinition = {
       id: 'run-live-01',
       mode: 'PREPROD',
@@ -22,6 +22,36 @@ describe('RunDetailPageView', () => {
       maxNodeConcurrency: 48,
       tags: {
         team: 'growth',
+      },
+      ticketTask: {
+        event: {
+          platform: '大麦',
+          eventName: '周杰伦上海站',
+          city: '上海',
+          venue: '上海体育场',
+          sessionLabel: '2026-05-01 19:30',
+          saleStartsAt: '2026-04-25T12:00:00.000Z',
+        },
+        ticket: {
+          tierLabel: '内场票',
+          priceLabel: '980元',
+          zoneLabel: 'A区',
+          quantity: 2,
+        },
+        nodeStrategy: {
+          poolId: 'pool-control-01',
+          launchMode: 'SYNC_WITH_JITTER',
+          preferredRegions: ['hk'],
+          expectedNodeCount: 6,
+        },
+        executionStrategy: {
+          objective: 'FULL_SUBMIT',
+          prewarmSeconds: 30,
+          workerLaunchIntervalMs: 1000,
+          queuePollIntervalMs: 1500,
+          lockRetryLimit: 3,
+          orderSubmitLimit: 2,
+        },
       },
       requestTemplates: {
         query: {
@@ -141,8 +171,12 @@ describe('RunDetailPageView', () => {
       </MemoryRouter>,
     );
 
-    expect(html).toContain('Run detail');
+    expect(html).toContain('任务作战台');
     expect(html).toContain('run-live-01');
+    expect(html).toContain('周杰伦上海站');
+    expect(html).toContain('内场票');
+    expect(html).toContain('980元');
+    expect(html).toContain('2张');
     expect(html).toContain('warmup');
     expect(html).toContain('node-01');
     expect(html).toContain('64');

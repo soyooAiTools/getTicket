@@ -39,13 +39,10 @@ export class HttpControlClient {
     runId: string,
     sample: NodeTelemetrySample,
   ): Promise<NodeTelemetrySample> {
-    return this.request<NodeTelemetrySample>(
-      '/runs/' + encodeURIComponent(runId) + '/telemetry',
-      {
-        method: 'POST',
-        body: sample,
-      },
-    );
+    return this.request<NodeTelemetrySample>('/telemetry', {
+      method: 'POST',
+      body: sample,
+    });
   }
 
   async submitSummary(

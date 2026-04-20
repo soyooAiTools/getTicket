@@ -51,6 +51,66 @@ export const nodeRegistrationSchema = z
   })
   .strict();
 
+export const ticketTaskLaunchModeSchema = z.enum([
+  'SYNC_WITH_JITTER',
+  'STAGGERED',
+]);
+
+export const ticketTaskExecutionObjectiveSchema = z.enum([
+  'QUEUE_ENTRY',
+  'LOCK_ONLY',
+  'FULL_SUBMIT',
+]);
+
+export const ticketTaskEventSchema = z
+  .object({
+    platform: z.string().min(1),
+    eventName: z.string().min(1),
+    city: z.string().min(1).optional(),
+    venue: z.string().min(1).optional(),
+    sessionLabel: z.string().min(1),
+    saleStartsAt: z.string().datetime().optional(),
+  })
+  .strict();
+
+export const ticketTaskTicketSchema = z
+  .object({
+    tierLabel: z.string().min(1),
+    priceLabel: z.string().min(1).optional(),
+    zoneLabel: z.string().min(1).optional(),
+    quantity: z.number().int().positive(),
+  })
+  .strict();
+
+export const ticketTaskNodeStrategySchema = z
+  .object({
+    poolId: z.string().min(1),
+    launchMode: ticketTaskLaunchModeSchema,
+    preferredRegions: z.array(z.string().min(1)).optional(),
+    expectedNodeCount: z.number().int().positive().optional(),
+  })
+  .strict();
+
+export const ticketTaskExecutionStrategySchema = z
+  .object({
+    objective: ticketTaskExecutionObjectiveSchema,
+    prewarmSeconds: z.number().int().nonnegative(),
+    workerLaunchIntervalMs: z.number().int().positive().optional(),
+    queuePollIntervalMs: z.number().int().positive().optional(),
+    lockRetryLimit: z.number().int().nonnegative().optional(),
+    orderSubmitLimit: z.number().int().nonnegative().optional(),
+  })
+  .strict();
+
+export const ticketTaskSchema = z
+  .object({
+    event: ticketTaskEventSchema,
+    ticket: ticketTaskTicketSchema,
+    nodeStrategy: ticketTaskNodeStrategySchema,
+    executionStrategy: ticketTaskExecutionStrategySchema,
+  })
+  .strict();
+
 const requestTemplatesSchema = z
   .object({
     query: requestTemplateSchema,
@@ -69,6 +129,7 @@ export const loadTestRunDefinitionSchema = z
     maxGlobalQps: z.number().int().positive(),
     maxNodeConcurrency: z.number().int().positive(),
     tags: z.record(z.string(), z.string()),
+    ticketTask: ticketTaskSchema.optional(),
     requestTemplates: requestTemplatesSchema,
     phases: z.array(scenarioPhaseSchema).min(1),
   })
@@ -177,6 +238,7 @@ export const controlRunRecordSchema = z
     targetBaseUrl: z.string().url(),
     status: runStatusSchema,
     tags: z.record(z.string(), z.string()),
+    ticketTask: ticketTaskSchema.optional(),
     createdAt: z.string().datetime(),
     updatedAt: z.string().datetime(),
   })
@@ -263,6 +325,19 @@ export type RequestTemplate = z.infer<typeof requestTemplateSchema>;
 export type ScenarioPhase = z.infer<typeof scenarioPhaseSchema>;
 export type NetworkProfile = z.infer<typeof networkProfileSchema>;
 export type NodeRegistration = z.infer<typeof nodeRegistrationSchema>;
+export type TicketTaskLaunchMode = z.infer<typeof ticketTaskLaunchModeSchema>;
+export type TicketTaskExecutionObjective = z.infer<
+  typeof ticketTaskExecutionObjectiveSchema
+>;
+export type TicketTaskEvent = z.infer<typeof ticketTaskEventSchema>;
+export type TicketTaskTicket = z.infer<typeof ticketTaskTicketSchema>;
+export type TicketTaskNodeStrategy = z.infer<
+  typeof ticketTaskNodeStrategySchema
+>;
+export type TicketTaskExecutionStrategy = z.infer<
+  typeof ticketTaskExecutionStrategySchema
+>;
+export type TicketTask = z.infer<typeof ticketTaskSchema>;
 export type LoadTestRunDefinition = z.infer<typeof loadTestRunDefinitionSchema>;
 export type PlannedNodeAssignment = z.infer<typeof plannedNodeAssignmentSchema>;
 export type PhaseSummary = z.infer<typeof phaseSummarySchema>;

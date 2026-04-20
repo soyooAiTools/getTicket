@@ -24,6 +24,14 @@ import {
   listRuns,
   listTemplates,
 } from '../../services/load-control';
+import {
+  formatTicketTaskEventSummary,
+  formatTicketTaskTicketSummary,
+  labelRunStatus,
+  labelTicketTaskExecutionObjective,
+  labelValidationMode,
+  runStatusColors,
+} from '../../shared/console-copy';
 
 type OverviewPageViewProps = {
   error?: string;
@@ -32,16 +40,6 @@ type OverviewPageViewProps = {
   onRefresh?: () => void;
   runs: ControlRunRecord[];
   templates: ScenarioTemplate[];
-};
-
-const statusColors: Record<ControlRunRecord['status'], string> = {
-  COMPLETED: 'green',
-  DRAFT: 'default',
-  FAILED: 'red',
-  PLANNED: 'gold',
-  RUNNING: 'blue',
-  STOPPED: 'default',
-  STOPPING: 'orange',
 };
 
 function formatTimestamp(value: string) {
@@ -63,7 +61,6 @@ export function OverviewPageView({
   runs,
   templates,
 }: OverviewPageViewProps) {
-  const templateNames = new Map(templates.map((template) => [template.id, template.name]));
   const nodePoolNames = new Map(nodePools.map((pool) => [pool.id, pool.name]));
   const recentRuns = [...runs]
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
@@ -80,11 +77,10 @@ export function OverviewPageView({
     <Space direction='vertical' size={24} style={{ display: 'flex' }}>
       <div>
         <Typography.Title level={2} style={{ marginBottom: 8 }}>
-          Operator overview
+          作战总览
         </Typography.Title>
         <Typography.Paragraph style={{ marginBottom: 0 }}>
-          Keep an eye on seeded capacity, active rehearsals, and the freshest
-          runs that still need operator action.
+          查看当前演练态势、可用节点资源和最近任务，快速进入新建任务或任务作战台。
         </Typography.Paragraph>
       </div>
 
@@ -92,11 +88,14 @@ export function OverviewPageView({
 
       <Space wrap>
         <Button loading={loading} onClick={onRefresh}>
-          Refresh
+          刷新
+        </Button>
+        <Button type='primary'>
+          <Link to='/runs'>新建抢票任务</Link>
         </Button>
         {comparisonLink ? (
-          <Button type='primary'>
-            <Link to={comparisonLink}>Open latest calibration report</Link>
+          <Button>
+            <Link to={comparisonLink}>打开最近一次校准复盘</Link>
           </Button>
         ) : null}
       </Space>
@@ -104,36 +103,52 @@ export function OverviewPageView({
       <Row gutter={[16, 16]}>
         <Col span={6}>
           <Card>
-            <Statistic title='Active runs' value={countActiveRuns(runs)} />
+            <Statistic title='运行中任务' value={countActiveRuns(runs)} />
           </Card>
         </Col>
         <Col span={6}>
           <Card>
-            <Statistic title='Completed runs' value={completedRuns.length} />
+            <Statistic title='已完成任务' value={completedRuns.length} />
           </Card>
         </Col>
         <Col span={6}>
           <Card>
-            <Statistic title='Node pools' value={nodePools.length} />
+            <Statistic title='节点池' value={nodePools.length} />
           </Card>
         </Col>
         <Col span={6}>
           <Card>
-            <Statistic title='Scenario templates' value={templates.length} />
+            <Statistic title='任务模板' value={templates.length} />
           </Card>
         </Col>
       </Row>
 
-      <Card title='Recent runs'>
+      <Card title='最近任务'>
         <Table<ControlRunRecord>
           columns={[
             {
               dataIndex: 'id',
-              key: 'id',
-              title: 'Run',
+              key: 'task',
+              title: '任务',
               render: (_value: string, record) => (
                 <Space direction='vertical' size={0}>
-                  <Link to={`/runs/${record.id}`}>{record.id}</Link>
+                  <Link to={`/runs/${record.id}`}>
+                    {formatTicketTaskEventSummary(record.ticketTask)}
+                  </Link>
+                  <Typography.Text type='secondary'>
+                    {record.id} / {labelValidationMode(record.mode)}
+                  </Typography.Text>
+                </Space>
+              ),
+            },
+            {
+              key: 'ticket',
+              title: '票档目标',
+              render: (_value: unknown, record) => (
+                <Space direction='vertical' size={0}>
+                  <Typography.Text>
+                    {formatTicketTaskTicketSummary(record.ticketTask)}
+                  </Typography.Text>
                   <Typography.Text type='secondary'>
                     {record.targetBaseUrl}
                   </Typography.Text>
@@ -141,29 +156,33 @@ export function OverviewPageView({
               ),
             },
             {
-              dataIndex: 'templateId',
-              key: 'templateId',
-              title: 'Template',
-              render: (value: string) => templateNames.get(value) ?? value,
+              key: 'nodePoolId',
+              title: '节点池',
+              render: (_value: unknown, record) =>
+                nodePoolNames.get(record.nodePoolId) ?? record.nodePoolId,
             },
             {
-              dataIndex: 'nodePoolId',
-              key: 'nodePoolId',
-              title: 'Node pool',
-              render: (value: string) => nodePoolNames.get(value) ?? value,
+              key: 'objective',
+              title: '执行目标',
+              render: (_value: unknown, record) =>
+                record.ticketTask
+                  ? labelTicketTaskExecutionObjective(
+                      record.ticketTask.executionStrategy.objective,
+                    )
+                  : '-',
             },
             {
               dataIndex: 'status',
               key: 'status',
-              title: 'Status',
+              title: '状态',
               render: (value: ControlRunRecord['status']) => (
-                <Tag color={statusColors[value]}>{value}</Tag>
+                <Tag color={runStatusColors[value]}>{labelRunStatus(value)}</Tag>
               ),
             },
             {
               dataIndex: 'updatedAt',
               key: 'updatedAt',
-              title: 'Updated',
+              title: '更新时间',
               render: (value: string) => formatTimestamp(value),
             },
           ]}
@@ -174,7 +193,7 @@ export function OverviewPageView({
         />
       </Card>
 
-      <Card title='Seeded scenario templates'>
+      <Card title='已预置任务模板'>
         <Row gutter={[16, 16]}>
           {templates.map((template) => (
             <Col key={template.id} span={12}>
@@ -184,10 +203,23 @@ export function OverviewPageView({
                   <Typography.Text type='secondary'>
                     {template.description}
                   </Typography.Text>
+                  <Typography.Text>
+                    {formatTicketTaskEventSummary(template.definition.ticketTask)}
+                  </Typography.Text>
+                  <Typography.Text type='secondary'>
+                    {formatTicketTaskTicketSummary(template.definition.ticketTask)}
+                  </Typography.Text>
                   <Space wrap>
-                    <Tag>{template.definition.mode}</Tag>
-                    <Tag>{template.definition.maxGlobalQps} global QPS</Tag>
-                    <Tag>{template.definition.maxNodeConcurrency} / node</Tag>
+                    <Tag>{labelValidationMode(template.definition.mode)}</Tag>
+                    {template.definition.ticketTask ? (
+                      <Tag>
+                        {labelTicketTaskExecutionObjective(
+                          template.definition.ticketTask.executionStrategy.objective,
+                        )}
+                      </Tag>
+                    ) : null}
+                    <Tag>全局 QPS {template.definition.maxGlobalQps}</Tag>
+                    <Tag>单节点 {template.definition.maxNodeConcurrency}</Tag>
                   </Space>
                 </Space>
               </Card>
@@ -224,7 +256,7 @@ export function OverviewPage() {
       setError(
         loadError instanceof Error
           ? loadError.message
-          : 'Unable to load the operator overview.',
+          : '无法加载作战总览。',
       );
     } finally {
       setLoading(false);

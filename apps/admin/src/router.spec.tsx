@@ -20,14 +20,14 @@ describe('AppRoutes', () => {
   it('renders the operator overview route inside the control shell', () => {
     const html = renderRoute('/overview');
 
-    expect(html).toContain('Load-testing operator console');
-    expect(html).toContain('Operator overview');
+    expect(html).toContain('抢票测试操作台');
+    expect(html).toContain('作战总览');
   });
 
   it('renders the run detail route for a specific run id', () => {
     const html = renderRoute('/runs/run-2026-04-18');
 
-    expect(html).toContain('Run detail');
+    expect(html).toContain('任务作战台');
     expect(html).toContain('run-2026-04-18');
   });
 });

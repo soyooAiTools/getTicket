@@ -25,6 +25,37 @@ import {
   viewerSchema,
 } from './index';
 
+const sampleTicketTask = {
+  event: {
+    platform: '大麦',
+    eventName: '周杰伦嘉年华世界巡回演唱会',
+    city: '上海',
+    venue: '上海体育场',
+    sessionLabel: '2026-05-01 19:30',
+    saleStartsAt: '2026-04-25T12:00:00.000Z',
+  },
+  ticket: {
+    tierLabel: '内场票',
+    priceLabel: '980元',
+    zoneLabel: 'A区',
+    quantity: 2,
+  },
+  nodeStrategy: {
+    poolId: 'pool-control-01',
+    launchMode: 'SYNC_WITH_JITTER',
+    preferredRegions: ['hk'],
+    expectedNodeCount: 6,
+  },
+  executionStrategy: {
+    objective: 'FULL_SUBMIT',
+    prewarmSeconds: 30,
+    workerLaunchIntervalMs: 1000,
+    queuePollIntervalMs: 1500,
+    lockRetryLimit: 3,
+    orderSubmitLimit: 2,
+  },
+} as const;
+
 describe('shared contracts', () => {
   it('validates an event summary payload', () => {
     expect(
@@ -367,6 +398,7 @@ describe('shared contracts', () => {
         tags: {
           test_run_id: 'run_preprod_20260417_001',
         },
+        ticketTask: sampleTicketTask,
         requestTemplates: {
           query: {
             method: 'GET',
@@ -440,6 +472,14 @@ describe('shared contracts', () => {
     ).toMatchObject({
       mode: 'PREPROD',
       maxGlobalQps: 2400,
+      ticketTask: {
+        event: {
+          eventName: '周杰伦嘉年华世界巡回演唱会',
+        },
+        executionStrategy: {
+          objective: 'FULL_SUBMIT',
+        },
+      },
     });
   });
 
@@ -462,8 +502,8 @@ describe('shared contracts', () => {
     expect(
       scenarioTemplateSchema.parse({
         id: 'template-preprod-01',
-        name: 'Preprod release window',
-        description: 'Baseline release-window template.',
+        name: '预发开售窗口演练',
+        description: '用于完整开售链路的预发演练模板。',
         definition: {
           mode: 'PREPROD',
           targetBaseUrl: 'https://preprod-api.example.com',
@@ -473,6 +513,7 @@ describe('shared contracts', () => {
           tags: {
             cohort: 'release-window',
           },
+          ticketTask: sampleTicketTask,
           requestTemplates: {
             query: {
               method: 'GET',
@@ -512,6 +553,11 @@ describe('shared contracts', () => {
       id: 'template-preprod-01',
       definition: {
         mode: 'PREPROD',
+        ticketTask: {
+          ticket: {
+            tierLabel: '内场票',
+          },
+        },
       },
     });
   });
@@ -614,6 +660,7 @@ describe('shared contracts', () => {
           tags: {
             release: '2026-04-18',
           },
+          ticketTask: sampleTicketTask,
           requestTemplates: {
             query: {
               method: 'GET',
@@ -652,6 +699,13 @@ describe('shared contracts', () => {
     ).toMatchObject({
       id: 'run-control-01',
       templateId: 'template-preprod-01',
+      definition: {
+        ticketTask: {
+          nodeStrategy: {
+            poolId: 'pool-control-01',
+          },
+        },
+      },
     });
   });
 
@@ -721,12 +775,18 @@ describe('shared contracts', () => {
         tags: {
           release: '2026-04-18',
         },
+        ticketTask: sampleTicketTask,
         createdAt: '2026-04-18T09:30:00.000Z',
         updatedAt: '2026-04-18T09:35:00.000Z',
       }),
     ).toMatchObject({
       status: 'RUNNING',
       nodePoolId: 'pool-hk-anchor',
+      ticketTask: {
+        executionStrategy: {
+          objective: 'FULL_SUBMIT',
+        },
+      },
     });
   });
 

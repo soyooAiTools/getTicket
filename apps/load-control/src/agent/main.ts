@@ -72,7 +72,7 @@ export function readRunId(env: EnvSource = process.env): string {
   return readEnv(
     env,
     ['LOAD_CONTROL_RUN_ID', 'LOAD_AGENT_RUN_ID'],
-    'run-preprod-1',
+    'run-local-demo-01',
   );
 }
 
