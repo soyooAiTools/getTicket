@@ -15,9 +15,42 @@ body {
   place-items: center;
 }
 
+.runtime-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 20px;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
 .panel {
   padding: 24px 28px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(0, 0, 0, 0.42);
   backdrop-filter: blur(8px);
+}
+
+.stage-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.game-mount {
+  min-height: 720px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.stage-copy h1,
+.hud h2 {
+  margin: 0 0 12px;
+}
+
+.stage-copy p,
+.hud p {
+  margin: 0 0 8px;
+}
+
+.hud {
+  align-self: start;
 }
