@@ -6,7 +6,7 @@ export class HealthController {
   getHealth() {
     return {
       status: 'ok',
-      service: 'authorized-ticketing-api',
+      service: 'load-testing-saas-api',
     };
   }
 }

@@ -16,7 +16,7 @@
 - `operator guide`: [2026-04-18-load-testing-saas-operator-guide.md](D:\CodexFolder\.worktrees\load-testing-saas-reframe\docs\superpowers\guides\2026-04-18-load-testing-saas-operator-guide.md)
 - `engineering handoff`: [2026-04-21-load-testing-saas-engineering-handoff.md](D:\CodexFolder\.worktrees\load-testing-saas-reframe\docs\superpowers\guides\2026-04-21-load-testing-saas-engineering-handoff.md)
 - `execution state`: completed on branch `codex/load-testing-saas-reframe`
-- `latest fresh smoke`: `run-handoff-smoke-20260421184833` completed on `2026-04-21` with `18/18` successful requests, `1` assignment, `1` summary, and `6` orders created through the sample target
+- `latest fresh smoke`: `run-handoff-smoke-20260421234408` completed on `2026-04-21` with `18/18` successful requests, `1` assignment, `1` summary, and `6` orders created through the sample target
 
 ## Task Breakdown
 
@@ -64,7 +64,7 @@
 - [x] `corepack pnpm --filter admin build`
 - [x] `corepack pnpm test`
 - [x] `.\start-local-stack.cmd --no-browser` from empty Docker volumes
-- [x] fresh real HTTP smoke against `apps/api` using `run-handoff-smoke-20260421184833`
+- [x] fresh real HTTP smoke against `apps/api` using `run-handoff-smoke-20260421234408`
 - [x] `corepack pnpm --filter api exec jest --runInBand`
 - [x] `corepack pnpm --filter load-control exec jest --runInBand`
 - [x] `corepack pnpm --filter @ticketing/contracts test -- --runInBand`

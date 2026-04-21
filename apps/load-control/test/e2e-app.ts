@@ -16,6 +16,7 @@ import type {
 } from '@ticketing/contracts';
 
 import { AppModule } from '../src/app.module';
+import { ZodValidationFilter } from '../src/common/http/zod-validation.filter';
 import { ControlRepository } from '../src/modules/control/control.repository';
 import { PrismaService } from '../src/common/prisma/prisma.service';
 import { RedisService } from '../src/common/redis/redis.service';
@@ -185,6 +186,7 @@ export async function createLoadControlE2eApp(): Promise<INestApplication> {
 
   const app = moduleRef.createNestApplication();
   app.setGlobalPrefix('control');
+  app.useGlobalFilters(new ZodValidationFilter());
   await app.init();
   return app;
 }

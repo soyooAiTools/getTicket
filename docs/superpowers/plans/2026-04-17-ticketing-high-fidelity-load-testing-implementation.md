@@ -693,7 +693,7 @@ describe('Load control health endpoint', () => {
       .expect(200)
       .expect({
         status: 'ok',
-        service: 'ticketing-load-control',
+        service: 'load-testing-saas-control',
       });
   });
 });
@@ -813,7 +813,7 @@ export class HealthController {
   getHealth() {
     return {
       status: 'ok',
-      service: 'ticketing-load-control',
+      service: 'load-testing-saas-control',
     };
   }
 }

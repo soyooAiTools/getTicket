@@ -27,8 +27,16 @@ describe('repo layout', () => {
     expect(existsSync('apps/load-control/package.json')).toBe(true);
     expect(existsSync('apps/load-control/prisma/schema.prisma')).toBe(true);
     expect(existsSync('apps/admin/package.json')).toBe(true);
+    expect(existsSync('apps/admin/index.html')).toBe(true);
     expect(existsSync('packages/contracts/package.json')).toBe(true);
     expect(readdirSync('apps').sort()).toEqual(['admin', 'api', 'load-control']);
+    expect(readdirSync('apps/admin/src/pages').sort()).toEqual([
+      'nodes',
+      'overview',
+      'reports',
+      'run-detail',
+      'runs',
+    ]);
 
     const rootPackage = readJson<{
       name: string;
@@ -36,7 +44,7 @@ describe('repo layout', () => {
       scripts?: Record<string, string>;
     }>('package.json');
 
-    expect(rootPackage.name).toBe('authorized-ticketing-platform');
+    expect(rootPackage.name).toBe('load-testing-saas-reframe');
     expect(rootPackage.packageManager).toMatch(/^pnpm@\d+\.\d+\.\d+$/);
     expect(rootPackage.scripts).toEqual(
       expect.objectContaining({
@@ -134,6 +142,9 @@ describe('repo layout', () => {
     expect(workspace).toContain('apps/*');
     expect(workspace).toContain('packages/*');
     expect(workspace).toContain('tests/*');
+
+    const adminHtml = readFileSync('apps/admin/index.html', 'utf8');
+    expect(adminHtml).toContain('<title>Load-Testing SaaS Console</title>');
 
     const apiInitLocalMigration = readFileSync(
       'apps/api/prisma/migrations/20260420162419_init_local/migration.sql',

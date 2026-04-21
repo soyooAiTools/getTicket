@@ -151,7 +151,7 @@ The current handoff smoke path is:
 
 Latest verified fresh smoke baseline on `2026-04-21`:
 
-- run id: `run-handoff-smoke-20260421184833`
+- run id: `run-handoff-smoke-20260421234408`
 - final status: `COMPLETED`
 - assignment count: `1`
 - summary count: `1`
@@ -178,7 +178,9 @@ corepack pnpm --filter load-control exec jest --runInBand
 corepack pnpm --filter @ticketing/contracts test -- --runInBand
 corepack pnpm exec tsc -p apps/api/tsconfig.json --noEmit
 corepack pnpm exec tsc -p apps/load-control/tsconfig.json --noEmit
-corepack pnpm exec vitest run tests/workspace/local-stack-launchers.spec.ts tests/workspace/repo-layout.spec.ts
+corepack pnpm exec vitest run apps/admin/src tests/workspace/repo-layout.spec.ts --reporter=verbose
+corepack pnpm exec vitest run tests/workspace/local-stack-launchers.spec.ts --reporter=verbose
+corepack pnpm --filter admin build
 ```
 
 ## Troubleshooting
@@ -186,6 +188,9 @@ corepack pnpm exec vitest run tests/workspace/local-stack-launchers.spec.ts test
 - If a fresh run fails during planning with a node foreign-key error, confirm the
   current `ControlService` change is present. Planned nodes must be persisted
   before assignments are written.
+- If `POST /control/runs` or telemetry ingestion returns `400`, check the
+  request payload first. Contract validation failures now surface as client
+  errors instead of opaque `500` responses.
 - If seeded runs or templates look stale after a reseed, restart with the local
   launcher so the post-seed Redis clear runs.
 - If the agent receives `401 Unauthorized` from `apps/api`, confirm

@@ -136,6 +136,9 @@ importers:
       supertest:
         specifier: ^7.2.2
         version: 7.2.2
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
     devDependencies:
       '@nestjs/cli':
         specifier: ^11.0.21

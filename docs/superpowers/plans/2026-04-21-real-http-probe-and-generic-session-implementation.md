@@ -14,7 +14,7 @@
 
 - `design reference`: [2026-04-21-real-http-probe-and-generic-session-design.md](D:\CodexFolder\.worktrees\load-testing-saas-reframe\docs\superpowers\specs\2026-04-21-real-http-probe-and-generic-session-design.md)
 - `execution state`: completed on branch `codex/load-testing-saas-reframe`
-- `latest acceptance smoke`: `run-handoff-smoke-20260421184833` completed on `2026-04-21`
+- `latest acceptance smoke`: `run-handoff-smoke-20260421234408` completed on `2026-04-21`
 - `acceptance evidence`: fresh local stack bootstrap, real HTTP workflow execution, successful summary persistence, and clean `api.err.log` / `load-control.err.log` after the final smoke
 
 ## Delivered Scope

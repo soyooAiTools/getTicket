@@ -5,6 +5,7 @@ import { Test } from '@nestjs/testing';
 import request from 'supertest';
 
 import { AppModule } from '../src/app.module';
+import { PrismaService } from '../src/common/prisma/prisma.service';
 
 describe('Health endpoint', () => {
   let app: INestApplication;
@@ -12,7 +13,13 @@ describe('Health endpoint', () => {
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(PrismaService)
+      .useValue({
+        onModuleInit: async () => undefined,
+        onModuleDestroy: async () => undefined,
+      })
+      .compile();
 
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix('api');
@@ -29,7 +36,7 @@ describe('Health endpoint', () => {
       .expect(200)
       .expect({
         status: 'ok',
-        service: 'authorized-ticketing-api',
+        service: 'load-testing-saas-api',
       });
   });
 });

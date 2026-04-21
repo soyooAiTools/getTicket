@@ -1,5 +1,5 @@
 {
-  "name": "authorized-ticketing-platform",
+  "name": "load-testing-saas-reframe",
   "private": true,
   "packageManager": "pnpm@10.8.1",
   "scripts": {

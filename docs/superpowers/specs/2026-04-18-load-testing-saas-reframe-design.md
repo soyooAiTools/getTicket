@@ -344,7 +344,7 @@ The current branch acceptance baseline for engineering handoff is:
 4. `real http probe`
    The default agent probe executes a real HTTP workflow against `apps/api` using `session bootstrap -> viewers -> catalog -> draft order`, and surfaces unauthorized responses instead of fabricating a retry path.
 5. `fresh smoke`
-   A fresh smoke run can complete end-to-end after stack bootstrap. Latest recorded acceptance run on `2026-04-21` is `run-handoff-smoke-20260421184833`, which completed with `18/18` successful requests, `1` assignment, `1` summary, and `6` resulting orders.
+   A fresh smoke run can complete end-to-end after stack bootstrap. Latest recorded acceptance run on `2026-04-21` is `run-handoff-smoke-20260421234408`, which completed with `18/18` successful requests, `1` assignment, `1` summary, and `6` resulting orders.
 6. `handoff boundary`
    The engineering handoff boundary is the load-testing SaaS surface only: `apps/admin`, `apps/load-control`, `apps/api`, and `packages/contracts`.
 

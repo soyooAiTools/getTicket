@@ -145,6 +145,62 @@ describe('Control endpoints', () => {
     });
   });
 
+  it('returns 400 when a draft run payload fails zod validation', async () => {
+    await request(app.getHttpServer())
+      .post('/control/runs')
+      .send({
+        id: 'run-invalid-01',
+        templateId: 'template-preprod-01',
+        nodePoolId: 'pool-control-01',
+        definition: {
+          mode: 'PREPROD',
+          targetBaseUrl: 'https://preprod.example.com',
+          maxGlobalQps: 1,
+          maxNodeConcurrency: 1,
+          tags: {},
+          requestTemplates: {
+            query: {
+              method: 'GET',
+              path: '/catalog',
+              timeoutMs: 500,
+            },
+            queue: {
+              method: 'GET',
+              path: '/catalog',
+              timeoutMs: 500,
+            },
+            inventoryLock: {
+              method: 'POST',
+              path: '/orders/draft',
+              timeoutMs: 500,
+            },
+            orderSubmit: {
+              method: 'POST',
+              path: '/orders/draft',
+              timeoutMs: 500,
+            },
+          },
+          phases: [
+            {
+              id: 'smoke',
+              startsAtOffsetMs: 0,
+              durationMs: 1000,
+              queryConcurrency: 1,
+              queuePollingConcurrency: 0,
+              inventoryLockConcurrency: 0,
+              orderSubmissionConcurrency: 0,
+            },
+          ],
+        },
+      })
+      .expect(400)
+      .expect({
+        statusCode: 400,
+        error: 'Bad Request',
+        message: 'Required',
+      });
+  });
+
   it('rejects partial phase summaries at POST /control/runs/:runId/results', async () => {
     const node = {
       id: 'node-results-01',

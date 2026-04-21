@@ -20,7 +20,7 @@ describe('HealthController (e2e)', () => {
       .expect(200)
       .expect({
         status: 'ok',
-        service: 'ticketing-load-control',
+        service: 'load-testing-saas-control',
       });
   });
 });

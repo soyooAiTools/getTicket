@@ -34,6 +34,8 @@ blocking handoff:
    the load agent
 6. routed admin pages and operator copy were cleaned up so the handoff surface
    no longer ships with mojibake UI text
+7. load-control Zod contract failures now return `400 Bad Request`, and the
+   API / control health payloads now use SaaS-specific service identifiers
 
 ## Primary Entry Points
 
@@ -65,7 +67,7 @@ Verified on `2026-04-21` from the current branch state:
 
 - `.\start-local-stack.cmd --no-browser` succeeded from empty Docker volumes
 - `api`, `load-control`, and `admin` all came up healthy
-- fresh smoke run `run-handoff-smoke-20260421184833` completed successfully
+- fresh smoke run `run-handoff-smoke-20260421234408` completed successfully
 - smoke result:
   - status `COMPLETED`
   - `1` assignment
@@ -82,7 +84,11 @@ corepack pnpm --filter load-control exec jest --runInBand
 corepack pnpm --filter @ticketing/contracts test -- --runInBand
 corepack pnpm exec tsc -p apps/api/tsconfig.json --noEmit
 corepack pnpm exec tsc -p apps/load-control/tsconfig.json --noEmit
-corepack pnpm exec vitest run tests/workspace/local-stack-launchers.spec.ts tests/workspace/repo-layout.spec.ts
+corepack pnpm --filter api test:e2e -- --runInBand --runTestsByPath test/health.e2e-spec.ts
+corepack pnpm --filter load-control test:e2e -- --runInBand --runTestsByPath test/health.e2e-spec.ts test/control.e2e-spec.ts
+corepack pnpm exec vitest run apps/admin/src tests/workspace/repo-layout.spec.ts --reporter=verbose
+corepack pnpm exec vitest run tests/workspace/local-stack-launchers.spec.ts --reporter=verbose
+corepack pnpm --filter admin build
 ```
 
 ## Suggested Review Order
@@ -103,9 +109,6 @@ corepack pnpm exec vitest run tests/workspace/local-stack-launchers.spec.ts test
 
 ## Known Constraints
 
-- the repository package name is still `authorized-ticketing-platform`; the
-  product framing has shifted, but the workspace package identifier has not
-  been renamed in this branch
 - admin tests still focus on routed SaaS pages rather than full visual
   regression coverage
 - this branch is intended as the clean SaaS handoff baseline, not as a mixed
