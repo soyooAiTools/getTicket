@@ -338,6 +338,36 @@ describe('MinorityThreatShell', () => {
     await view.unmount();
   });
 
+  it('does not advance the run until the audio play event fires', async () => {
+    const view = await renderShell();
+    const input = getFileInput(view.container);
+    const startButton = getStartButton(view.container);
+
+    selectFile(
+      input,
+      new File(['ok'], 'Minority Unit - Minority Threat.mp3', {
+        type: 'audio/mpeg',
+      }),
+    );
+    act(() => {
+      shellFixtures.currentAudio?.dispatchEvent(new Event('loadedmetadata'));
+    });
+
+    act(() => {
+      startButton.click();
+    });
+
+    expect(shellFixtures.startSpy).not.toHaveBeenCalled();
+
+    act(() => {
+      shellFixtures.currentAudio?.dispatchEvent(new Event('play'));
+    });
+
+    expect(shellFixtures.startSpy).toHaveBeenCalledTimes(1);
+
+    await view.unmount();
+  });
+
   it('keeps the runtime paused if audio playback fails to start', async () => {
     shellFixtures.playSpy.mockRejectedValueOnce(new Error('play blocked'));
 
@@ -446,6 +476,29 @@ describe('MinorityThreatShell', () => {
     expect(view.container.textContent).toContain('Survived');
     expect(view.container.textContent).toContain('Downs: 2');
     expect(view.container.textContent).toContain('Hit windows: 7');
+    expect(view.container.textContent).toContain('Replay Slice');
+
+    await view.unmount();
+  });
+
+  it('completes the run when playback crosses the authored segment end', async () => {
+    const view = await renderShell();
+    const input = getFileInput(view.container);
+
+    selectFile(
+      input,
+      new File(['ok'], 'Minority Unit - Minority Threat.mp3', {
+        type: 'audio/mpeg',
+      }),
+    );
+    act(() => {
+      if (shellFixtures.currentAudio) {
+        shellFixtures.currentAudio.currentTime = 76;
+        shellFixtures.currentAudio.dispatchEvent(new Event('timeupdate'));
+      }
+    });
+
+    expect(shellFixtures.completeSpy).toHaveBeenCalledTimes(1);
     expect(view.container.textContent).toContain('Replay Slice');
 
     await view.unmount();

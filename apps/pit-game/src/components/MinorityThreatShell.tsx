@@ -13,13 +13,12 @@ export function MinorityThreatShell() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioCleanupRef = useRef<(() => void) | null>(null);
-  const sliceEndHandledRef = useRef(false);
   const ownedUrlRef = useRef<string | null>(null);
   const controllerRef = useRef(
     createVerticalSliceController(minorityThreatVerticalSlice),
   );
   const controller = controllerRef.current;
-  const [summary, setSummary] = useState<{
+  const [runResult, setRunResult] = useState<{
     label: 'Survived' | 'Dropped';
     downCount: number;
     hitWindows: number;
@@ -34,7 +33,6 @@ export function MinorityThreatShell() {
     audioCleanupRef.current = null;
     audioRef.current?.pause();
     audioRef.current = null;
-    sliceEndHandledRef.current = false;
     setIsAudioReady(false);
 
     if (revokeObjectUrl && ownedUrlRef.current) {
@@ -50,7 +48,7 @@ export function MinorityThreatShell() {
 
   useEffect(() => {
     return controller.subscribe((nextSession) => {
-      setSummary(nextSession.summary);
+      setRunResult(nextSession.summary);
       setIsRunning(controller.isRunning());
     });
   }, [controller]);
@@ -89,47 +87,31 @@ export function MinorityThreatShell() {
       return;
     }
 
-    const sliceEndSeconds = minorityThreatVerticalSlice.audio.segmentEndMs / 1_000;
+    const sliceEndSeconds = Number(audio.dataset.sliceEndSeconds ?? '0');
 
     const handlePlay = () => {
-      sliceEndHandledRef.current = false;
       controller.start();
     };
 
-    const handlePause = () => {
-      if (!sliceEndHandledRef.current) {
-        controller.pause();
-      }
-    };
-
-    const handleEnded = () => {
-      if (sliceEndHandledRef.current) {
-        return;
-      }
-
-      sliceEndHandledRef.current = true;
-      controller.complete();
-    };
+    const handlePause = () => controller.pause();
 
     const handleTimeUpdate = () => {
-      if (sliceEndHandledRef.current || audio.currentTime < sliceEndSeconds) {
+      if (audio.currentTime < sliceEndSeconds) {
         return;
       }
 
-      sliceEndHandledRef.current = true;
       controller.complete();
+      setRunResult(controller.getSnapshot().summary);
       audio.pause();
     };
 
     audio.addEventListener('play', handlePlay);
     audio.addEventListener('pause', handlePause);
-    audio.addEventListener('ended', handleEnded);
     audio.addEventListener('timeupdate', handleTimeUpdate);
 
     return () => {
       audio.removeEventListener('play', handlePlay);
       audio.removeEventListener('pause', handlePause);
-      audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
     };
   }, [controller, loadedFileName, isAudioReady]);
@@ -140,22 +122,24 @@ export function MinorityThreatShell() {
     };
   }, []);
 
-  const startSlice = () => {
-    if (
-      !audioRef.current ||
-      loadedFileName !== minorityThreatVerticalSlice.audio.fileName ||
-      !isAudioReady
-    ) {
+  const startSlice = async () => {
+    if (!audioRef.current || !isAudioReady) {
       return;
     }
 
     controller.reset();
+    setRunResult(null);
+    setError(null);
     audioRef.current.pause();
     audioRef.current.currentTime =
       minorityThreatVerticalSlice.audio.segmentStartMs / 1_000;
-    void audioRef.current.play().catch(() => {
+
+    try {
+      await audioRef.current.play();
+    } catch {
       controller.pause();
-    });
+      setError('Could not start audio playback. Click Start Slice again.');
+    }
   };
 
   return (
@@ -166,11 +150,10 @@ export function MinorityThreatShell() {
           fileName={minorityThreatVerticalSlice.audio.fileName}
           loadedFileName={loadedFileName}
           canStart={
-            loadedFileName === minorityThreatVerticalSlice.audio.fileName &&
-            isAudioReady
+            loadedFileName === minorityThreatVerticalSlice.audio.fileName && isAudioReady
           }
           isRunning={isRunning}
-          result={summary}
+          result={runResult}
           onLoadSong={() => fileInputRef.current?.click()}
           onStart={startSlice}
           onRestart={startSlice}
@@ -222,6 +205,7 @@ export function MinorityThreatShell() {
           };
           ownedUrlRef.current = objectUrl;
           audioRef.current = nextAudio;
+          setRunResult(null);
           setIsAudioReady(nextAudio.readyState >= 1);
           setLoadedFileName(file.name);
           setError(null);
