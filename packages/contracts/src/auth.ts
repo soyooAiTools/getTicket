@@ -1,19 +1,19 @@
 import { z } from 'zod';
 
-export const miniappCustomerSchema = z
+export const customerIdentitySchema = z
   .object({
     id: z.string().min(1),
     accountKey: z.string().min(1),
   })
   .strict();
 
-export const miniappSessionSchema = z
+export const customerSessionSchema = z
   .object({
     token: z.string().min(1),
-    customer: miniappCustomerSchema,
+    customer: customerIdentitySchema,
     expiresAt: z.string().datetime(),
   })
   .strict();
 
-export type MiniappCustomer = z.infer<typeof miniappCustomerSchema>;
-export type MiniappSession = z.infer<typeof miniappSessionSchema>;
+export type CustomerIdentity = z.infer<typeof customerIdentitySchema>;
+export type CustomerSession = z.infer<typeof customerSessionSchema>;

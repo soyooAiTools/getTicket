@@ -17,10 +17,10 @@ export {
   type SaleStatus,
 } from './event';
 export {
-  miniappCustomerSchema,
-  miniappSessionSchema,
-  type MiniappCustomer,
-  type MiniappSession,
+  customerIdentitySchema,
+  customerSessionSchema,
+  type CustomerIdentity,
+  type CustomerSession,
 } from './auth';
 export {
   orderDetailSchema,

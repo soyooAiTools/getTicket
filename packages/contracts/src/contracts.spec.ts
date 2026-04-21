@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   calibrationReportSchema,
+  customerIdentitySchema,
+  customerSessionSchema,
   eventCatalogSummarySchema,
   eventDetailSchema,
   eventOperationsUpdateSchema,
@@ -12,7 +14,6 @@ import {
   ticketTierSummarySchema,
   loadTestRunDefinitionSchema,
   networkProfileSchema,
-  miniappSessionSchema,
   paymentIntentSchema,
   viewerSchema,
 } from './index';
@@ -300,9 +301,20 @@ describe('shared contracts', () => {
     });
   });
 
-  it('validates a miniapp session payload', () => {
+  it('validates a customer identity payload', () => {
     expect(
-      miniappSessionSchema.parse({
+      customerIdentitySchema.parse({
+        id: 'cust_001',
+        accountKey: 'customer_key_abc123',
+      }),
+    ).toMatchObject({
+      accountKey: 'customer_key_abc123',
+    });
+  });
+
+  it('validates a customer session payload', () => {
+    expect(
+      customerSessionSchema.parse({
         token: 'session-token-123',
         customer: {
           id: 'cust_001',
@@ -318,9 +330,9 @@ describe('shared contracts', () => {
     });
   });
 
-  it('rejects a miniapp session payload with extra fields', () => {
+  it('rejects a customer session payload with extra fields', () => {
     expect(() =>
-      miniappSessionSchema.parse({
+      customerSessionSchema.parse({
         token: 'session-token-123',
         customer: {
           id: 'cust_001',
