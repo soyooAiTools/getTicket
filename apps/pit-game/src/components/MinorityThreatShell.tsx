@@ -6,6 +6,7 @@ import {
   buildSliceAudioElement,
   validateMinorityThreatFile,
 } from '../game/runtime/vertical-slice-audio';
+import { MinorityThreatRunOverlay } from './MinorityThreatRunOverlay';
 
 function formatSummary(summary: {
   label: 'Survived' | 'Dropped';
@@ -26,13 +27,15 @@ export function MinorityThreatShell() {
     createVerticalSliceController(minorityThreatVerticalSlice),
   );
   const controller = controllerRef.current;
+  const [summary, setSummary] = useState<{
+    label: 'Survived' | 'Dropped';
+    downCount: number;
+    hitWindows: number;
+  } | null>(controller.getSnapshot().summary);
   const [loadedFileName, setLoadedFileName] = useState<string | null>(null);
   const [isAudioReady, setIsAudioReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [summaryText, setSummaryText] = useState<string | null>(() => {
-    const summary = controller.getSnapshot().summary;
-    return summary ? formatSummary(summary) : null;
-  });
+  const summaryText = summary ? formatSummary(summary) : null;
 
   const releaseAudio = (revokeObjectUrl: boolean) => {
     audioCleanupRef.current?.();
@@ -55,9 +58,7 @@ export function MinorityThreatShell() {
 
   useEffect(() => {
     return controller.subscribe((nextSession) => {
-      setSummaryText(
-        nextSession.summary ? formatSummary(nextSession.summary) : null,
-      );
+      setSummary(nextSession.summary);
     });
   }, [controller]);
 
@@ -146,113 +147,106 @@ export function MinorityThreatShell() {
     };
   }, []);
 
+  const startSlice = () => {
+    if (
+      !audioRef.current ||
+      loadedFileName !== minorityThreatVerticalSlice.audio.fileName ||
+      !isAudioReady
+    ) {
+      return;
+    }
+
+    controller.reset();
+    audioRef.current.pause();
+    audioRef.current.currentTime =
+      minorityThreatVerticalSlice.audio.segmentStartMs / 1_000;
+    void audioRef.current.play().catch(() => {
+      controller.pause();
+    });
+  };
+
   return (
     <section className='minority-shell'>
-      <div className='minority-shell__copy'>
-        <p className='minority-shell__eyebrow'>Vertical Slice</p>
-        <h1>Minority Threat Vertical Slice</h1>
-        <p>30 seconds of authored pit violence.</p>
-        <p>Load the exact song file to start the slice.</p>
-        <p>{minorityThreatVerticalSlice.audio.fileName}</p>
-        {loadedFileName ? <p>Loaded: {loadedFileName}</p> : null}
-        {error ? <p className='minority-shell__error'>{error}</p> : null}
-        {summaryText ? <p className='minority-shell__summary'>{summaryText}</p> : null}
-      </div>
-
-      <div className='minority-shell__actions'>
-        <button
-          type='button'
-          className='form-control'
-          onClick={() => {
-            fileInputRef.current?.click();
-          }}
-        >
-          Load Minority Threat.mp3
-        </button>
-        <button
-          type='button'
-          className='form-control'
-          disabled={
-            loadedFileName !== minorityThreatVerticalSlice.audio.fileName ||
-            !isAudioReady
+      <div className='minority-shell__stage'>
+        <div ref={mountRef} className='minority-shell__mount' />
+        <MinorityThreatRunOverlay
+          fileName={minorityThreatVerticalSlice.audio.fileName}
+          loadedFileName={loadedFileName}
+          canStart={
+            loadedFileName === minorityThreatVerticalSlice.audio.fileName &&
+            isAudioReady
           }
-          onClick={() => {
-            if (
-              !audioRef.current ||
-              loadedFileName !== minorityThreatVerticalSlice.audio.fileName ||
-              !isAudioReady
-            ) {
-              return;
-            }
-
-            controller.reset();
-            audioRef.current.pause();
-            audioRef.current.currentTime =
-              minorityThreatVerticalSlice.audio.segmentStartMs / 1_000;
-            void audioRef.current.play().catch(() => {
-              controller.pause();
-            });
-          }}
-        >
-          Start Slice
-        </button>
-        <input
-          ref={fileInputRef}
-          type='file'
-          accept='.mp3,.wav,.ogg'
-          hidden
-          onChange={(event) => {
-            const file = event.currentTarget.files?.[0];
-
-            if (!file) {
-              event.currentTarget.value = '';
-              return;
-            }
-
-            const validationError = validateMinorityThreatFile(file);
-
-            if (validationError) {
-              releaseAudio(true);
-              setLoadedFileName(null);
-              setError(validationError);
-              event.currentTarget.value = '';
-              return;
-            }
-
-            releaseAudio(true);
-
-            const objectUrl = URL.createObjectURL(file);
-            const nextAudio = buildSliceAudioElement(
-              minorityThreatVerticalSlice.audio,
-              objectUrl,
-            );
-            const handleLoadedMetadata = () => {
-              if (audioRef.current !== nextAudio) {
-                return;
-              }
-
-              setIsAudioReady(true);
-            };
-
-            nextAudio.addEventListener('loadedmetadata', handleLoadedMetadata);
-
-            audioCleanupRef.current = () => {
-              nextAudio.removeEventListener(
-                'loadedmetadata',
-                handleLoadedMetadata,
-              );
-            };
-            ownedUrlRef.current = objectUrl;
-            audioRef.current = nextAudio;
-            setIsAudioReady(nextAudio.readyState >= 1);
-            setLoadedFileName(file.name);
-            setError(null);
-            event.currentTarget.value = '';
-          }}
+          isRunning={controller.isRunning()}
+          result={summary}
+          onLoadSong={() => fileInputRef.current?.click()}
+          onStart={startSlice}
+          onRestart={startSlice}
         />
+        <div
+          className='minority-shell__copy minority-shell__copy--legacy'
+          aria-hidden='true'
+        >
+          <p className='minority-shell__eyebrow'>Vertical Slice</p>
+          <h1>Minority Threat Vertical Slice</h1>
+          <p>30 seconds of authored pit violence.</p>
+          <p>Load the exact song file to start the slice.</p>
+          <p>{minorityThreatVerticalSlice.audio.fileName}</p>
+          {loadedFileName ? <p>Loaded: {loadedFileName}</p> : null}
+          {error ? <p className='minority-shell__error'>{error}</p> : null}
+          {summaryText ? <p className='minority-shell__summary'>{summaryText}</p> : null}
+        </div>
       </div>
+      <input
+        ref={fileInputRef}
+        type='file'
+        accept='.mp3,.wav,.ogg'
+        hidden
+        onChange={(event) => {
+          const file = event.currentTarget.files?.[0];
 
-      <div ref={mountRef} className='minority-shell__mount' />
+          if (!file) {
+            event.currentTarget.value = '';
+            return;
+          }
+
+          const validationError = validateMinorityThreatFile(file);
+
+          if (validationError) {
+            releaseAudio(true);
+            setLoadedFileName(null);
+            setError(validationError);
+            event.currentTarget.value = '';
+            return;
+          }
+
+          releaseAudio(true);
+
+          const objectUrl = URL.createObjectURL(file);
+          const nextAudio = buildSliceAudioElement(
+            minorityThreatVerticalSlice.audio,
+            objectUrl,
+          );
+          const handleLoadedMetadata = () => {
+            if (audioRef.current !== nextAudio) {
+              return;
+            }
+
+            setIsAudioReady(true);
+          };
+
+          nextAudio.addEventListener('loadedmetadata', handleLoadedMetadata);
+
+          audioCleanupRef.current = () => {
+            nextAudio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+          };
+          ownedUrlRef.current = objectUrl;
+          audioRef.current = nextAudio;
+          setIsAudioReady(nextAudio.readyState >= 1);
+          setLoadedFileName(file.name);
+          setError(null);
+          event.currentTarget.value = '';
+        }}
+      />
     </section>
   );
 }
