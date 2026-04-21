@@ -332,9 +332,9 @@ export function buildVerticalSliceScene(controller: VerticalSliceController) {
     private summaryText!: Phaser.GameObjects.Text;
     private selectedZone: VerticalSliceZone = 'edge';
     private lastImpactKey: string | null = null;
+    private controllerUnsubscribe: (() => void) | null = null;
 
     create() {
-      controller.reset();
       const initialSnapshot = controller.getSnapshot();
       this.selectedZone = initialSnapshot.player.zone;
 
@@ -394,9 +394,22 @@ export function buildVerticalSliceScene(controller: VerticalSliceController) {
       };
 
       this.renderSnapshot(initialSnapshot, false, null);
+      this.controllerUnsubscribe = controller.subscribe((snapshot) => {
+        if (!controller.isRunning()) {
+          this.selectedZone = snapshot.player.zone;
+          this.renderSnapshot(snapshot, false, null);
+        }
+      });
+
+      this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.handleShutdown, this);
+      this.events.once(Phaser.Scenes.Events.DESTROY, this.handleShutdown, this);
     }
 
     update(_time: number, delta: number) {
+      if (!controller.isRunning()) {
+        return;
+      }
+
       const input = resolveSliceInput(
         {
           move: this.controls.move.isDown,
@@ -460,6 +473,11 @@ export function buildVerticalSliceScene(controller: VerticalSliceController) {
 
       this.phaseText.setText(formatPhaseLabel(snapshot.frame));
       this.summaryText.setText(formatSummary(snapshot));
+    }
+
+    private handleShutdown() {
+      this.controllerUnsubscribe?.();
+      this.controllerUnsubscribe = null;
     }
   };
 }

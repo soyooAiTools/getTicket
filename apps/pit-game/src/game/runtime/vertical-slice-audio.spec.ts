@@ -26,7 +26,7 @@ describe('validateMinorityThreatFile', () => {
 describe('buildSliceAudioElement', () => {
   it('creates an audio element primed to the authored slice start', () => {
     const audio = buildSliceAudioElement(
-      { segmentStartMs: 46_000 },
+      { segmentStartMs: 46_000, segmentEndMs: 76_000 },
       'blob:minority-threat',
     );
 

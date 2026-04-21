@@ -20,6 +20,7 @@ export function MinorityThreatShell() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioCleanupRef = useRef<(() => void) | null>(null);
+  const sliceEndHandledRef = useRef(false);
   const ownedUrlRef = useRef<string | null>(null);
   const controllerRef = useRef(
     createVerticalSliceController(minorityThreatVerticalSlice),
@@ -38,6 +39,7 @@ export function MinorityThreatShell() {
     audioCleanupRef.current = null;
     audioRef.current?.pause();
     audioRef.current = null;
+    sliceEndHandledRef.current = false;
     setIsAudioReady(false);
 
     if (revokeObjectUrl && ownedUrlRef.current) {
@@ -87,6 +89,58 @@ export function MinorityThreatShell() {
   }, [controller]);
 
   useEffect(() => {
+    const audio = audioRef.current;
+
+    if (!audio) {
+      return;
+    }
+
+    const sliceEndSeconds = minorityThreatVerticalSlice.audio.segmentEndMs / 1_000;
+
+    const handlePlay = () => {
+      sliceEndHandledRef.current = false;
+      controller.start();
+    };
+
+    const handlePause = () => {
+      if (!sliceEndHandledRef.current) {
+        controller.pause();
+      }
+    };
+
+    const handleEnded = () => {
+      if (sliceEndHandledRef.current) {
+        return;
+      }
+
+      sliceEndHandledRef.current = true;
+      controller.complete();
+    };
+
+    const handleTimeUpdate = () => {
+      if (sliceEndHandledRef.current || audio.currentTime < sliceEndSeconds) {
+        return;
+      }
+
+      sliceEndHandledRef.current = true;
+      controller.complete();
+      audio.pause();
+    };
+
+    audio.addEventListener('play', handlePlay);
+    audio.addEventListener('pause', handlePause);
+    audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+
+    return () => {
+      audio.removeEventListener('play', handlePlay);
+      audio.removeEventListener('pause', handlePause);
+      audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+    };
+  }, [controller, loadedFileName, isAudioReady]);
+
+  useEffect(() => {
     return () => {
       releaseAudio(true);
     };
@@ -97,10 +151,9 @@ export function MinorityThreatShell() {
       <div className='minority-shell__copy'>
         <p className='minority-shell__eyebrow'>Vertical Slice</p>
         <h1>Minority Threat Vertical Slice</h1>
-        <p>30 seconds of authored pit violence</p>
-        <p>Load the song file to start the slice.</p>
+        <p>30 seconds of authored pit violence.</p>
+        <p>Load the exact song file to start the slice.</p>
         <p>{minorityThreatVerticalSlice.audio.fileName}</p>
-        <p>{minorityThreatVerticalSlice.audio.localPath}</p>
         {loadedFileName ? <p>Loaded: {loadedFileName}</p> : null}
         {error ? <p className='minority-shell__error'>{error}</p> : null}
         {summaryText ? <p className='minority-shell__summary'>{summaryText}</p> : null}
@@ -136,7 +189,9 @@ export function MinorityThreatShell() {
             audioRef.current.pause();
             audioRef.current.currentTime =
               minorityThreatVerticalSlice.audio.segmentStartMs / 1_000;
-            void audioRef.current.play().catch(() => undefined);
+            void audioRef.current.play().catch(() => {
+              controller.pause();
+            });
           }}
         >
           Start Slice

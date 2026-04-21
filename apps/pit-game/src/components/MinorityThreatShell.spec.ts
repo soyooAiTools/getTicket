@@ -21,6 +21,9 @@ const shellFixtures = vi.hoisted(() => {
     createObjectUrlCalls: [] as string[],
     currentAudio: null as HTMLAudioElement | null,
     destroyCalls: [] as boolean[],
+    startSpy: vi.fn(),
+    pauseSpy: vi.fn(),
+    completeSpy: vi.fn(),
     playSpy: vi.fn(() => Promise.resolve()),
     resetSpy: vi.fn(),
     revokeObjectUrlCalls: [] as string[],
@@ -52,6 +55,7 @@ vi.mock('../game/runtime/vertical-slice-controller', () => ({
       downCount: number;
       hitWindows: number;
     } | null = null;
+    let running = false;
     const listeners = new Set<
       (session: {
         summary: {
@@ -71,8 +75,32 @@ vi.mock('../game/runtime/vertical-slice-controller', () => ({
       getSnapshot() {
         return { summary };
       },
+      isRunning() {
+        return running;
+      },
+      start() {
+        running = true;
+        shellFixtures.startSpy();
+        listeners.forEach((listener) => listener({ summary }));
+      },
+      pause() {
+        running = false;
+        shellFixtures.pauseSpy();
+        listeners.forEach((listener) => listener({ summary }));
+      },
+      complete() {
+        running = false;
+        shellFixtures.completeSpy();
+        summary = {
+          label: 'Survived',
+          downCount: 0,
+          hitWindows: 0,
+        };
+        listeners.forEach((listener) => listener({ summary }));
+      },
       reset() {
         summary = null;
+        running = false;
         shellFixtures.resetSpy();
         listeners.forEach((listener) => listener({ summary }));
       },
@@ -146,6 +174,9 @@ describe('MinorityThreatShell', () => {
     shellFixtures.createObjectUrlCalls.length = 0;
     shellFixtures.currentAudio = null;
     shellFixtures.destroyCalls.length = 0;
+    shellFixtures.startSpy.mockClear();
+    shellFixtures.pauseSpy.mockClear();
+    shellFixtures.completeSpy.mockClear();
     shellFixtures.playSpy.mockClear();
     shellFixtures.resetSpy.mockClear();
     shellFixtures.revokeObjectUrlCalls.length = 0;
@@ -169,7 +200,9 @@ describe('MinorityThreatShell', () => {
         if (tagName.toLowerCase() === 'audio') {
           const audio = element as HTMLAudioElement;
           audio.play = shellFixtures.playSpy as typeof audio.play;
-          audio.pause = vi.fn();
+          audio.pause = vi.fn(() => {
+            audio.dispatchEvent(new Event('pause'));
+          }) as typeof audio.pause;
           shellFixtures.currentAudio = audio;
         }
 
@@ -189,18 +222,16 @@ describe('MinorityThreatShell', () => {
     document.body.innerHTML = '';
   });
 
-  it('renders the authored song instructions and local path', async () => {
+  it('renders the authored song instructions and filename', async () => {
     const view = await renderShell();
 
     expect(view.container.textContent).toContain(
       'Minority Unit - Minority Threat.mp3',
     );
     expect(view.container.textContent).toContain(
-      'C:/Users/Nick/Desktop/Minority Unit - Minority Threat.mp3',
+      'Load the exact song file to start the slice.',
     );
-    expect(view.container.textContent).toContain(
-      'Load the song file to start the slice.',
-    );
+    expect(view.container.textContent).not.toContain('C:/Users/Nick/Desktop');
 
     await view.unmount();
   });
@@ -270,6 +301,7 @@ describe('MinorityThreatShell', () => {
 
     expect(shellFixtures.resetSpy).not.toHaveBeenCalled();
     expect(shellFixtures.playSpy).not.toHaveBeenCalled();
+    expect(shellFixtures.startSpy).not.toHaveBeenCalled();
 
     act(() => {
       shellFixtures.currentAudio?.dispatchEvent(new Event('loadedmetadata'));
@@ -282,6 +314,85 @@ describe('MinorityThreatShell', () => {
     expect(shellFixtures.resetSpy).toHaveBeenCalledTimes(1);
     expect(shellFixtures.currentAudio?.currentTime).toBe(46);
     expect(shellFixtures.playSpy).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      shellFixtures.currentAudio?.dispatchEvent(new Event('play'));
+    });
+
+    expect(shellFixtures.startSpy).toHaveBeenCalledTimes(1);
+
+    shellFixtures.pauseSpy.mockClear();
+
+    act(() => {
+      shellFixtures.currentAudio?.dispatchEvent(new Event('pause'));
+    });
+
+    expect(shellFixtures.pauseSpy).toHaveBeenCalledTimes(1);
+
+    await view.unmount();
+  });
+
+  it('keeps the runtime paused if audio playback fails to start', async () => {
+    shellFixtures.playSpy.mockRejectedValueOnce(new Error('play blocked'));
+
+    const view = await renderShell();
+    const input = getFileInput(view.container);
+    const startButton = getStartButton(view.container);
+
+    selectFile(
+      input,
+      new File(['ok'], 'Minority Unit - Minority Threat.mp3', {
+        type: 'audio/mpeg',
+      }),
+    );
+
+    act(() => {
+      shellFixtures.currentAudio?.dispatchEvent(new Event('loadedmetadata'));
+    });
+
+    act(() => {
+      startButton.click();
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(shellFixtures.playSpy).toHaveBeenCalledTimes(1);
+    expect(shellFixtures.startSpy).not.toHaveBeenCalled();
+
+    await view.unmount();
+  });
+
+  it('completes the slice and pauses audio when playback reaches the authored end', async () => {
+    const view = await renderShell();
+    const input = getFileInput(view.container);
+    const startButton = getStartButton(view.container);
+
+    selectFile(
+      input,
+      new File(['ok'], 'Minority Unit - Minority Threat.mp3', {
+        type: 'audio/mpeg',
+      }),
+    );
+
+    act(() => {
+      shellFixtures.currentAudio?.dispatchEvent(new Event('loadedmetadata'));
+      startButton.click();
+      shellFixtures.currentAudio?.dispatchEvent(new Event('play'));
+    });
+
+    expect(shellFixtures.startSpy).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      if (shellFixtures.currentAudio) {
+        shellFixtures.currentAudio.currentTime = 76;
+        shellFixtures.currentAudio.dispatchEvent(new Event('timeupdate'));
+      }
+    });
+
+    expect(shellFixtures.completeSpy).toHaveBeenCalledTimes(1);
+    expect(shellFixtures.currentAudio?.pause).toHaveBeenCalledTimes(1);
 
     await view.unmount();
   });

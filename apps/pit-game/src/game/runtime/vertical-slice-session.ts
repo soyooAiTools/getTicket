@@ -199,3 +199,30 @@ export function stepVerticalSliceSession(
 
   return current;
 }
+
+export function completeVerticalSliceSession(
+  session: VerticalSliceSession,
+  input: VerticalSliceInput,
+): VerticalSliceSession {
+  if (session.failed || session.completed) {
+    return session;
+  }
+
+  const remainingMs = session.fixture.profile.durationMs - session.elapsedMs;
+  const steppedSession =
+    remainingMs > 0 ? stepVerticalSliceSession(session, input, remainingMs) : session;
+
+  if (steppedSession.failed || steppedSession.completed) {
+    return steppedSession;
+  }
+
+  return {
+    ...steppedSession,
+    completed: true,
+    summary: {
+      label: 'Survived',
+      downCount: steppedSession.downCount,
+      hitWindows: steppedSession.hitWindows,
+    },
+  };
+}

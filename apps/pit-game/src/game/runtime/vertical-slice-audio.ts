@@ -11,7 +11,7 @@ export function validateMinorityThreatFile(file: File): string | null {
 }
 
 export function buildSliceAudioElement(
-  source: Pick<VerticalSliceAudioSource, 'segmentStartMs'>,
+  source: Pick<VerticalSliceAudioSource, 'segmentStartMs' | 'segmentEndMs'>,
   objectUrl: string,
 ): HTMLAudioElement {
   const audio = document.createElement('audio');
