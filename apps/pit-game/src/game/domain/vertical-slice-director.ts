@@ -73,9 +73,9 @@ export function createVerticalSliceFrame(fixture: VerticalSliceFixture, atMs: nu
       phase,
       event,
       dangerKind: 'crush',
-      recommendedAction: 'brace',
-      cameraCue: 'impact',
-      lightCue: 'hit',
+      recommendedAction: event?.kind === 'breakdown-hit' ? 'brace' : 'shove',
+      cameraCue: event?.kind === 'breakdown-hit' ? 'impact' : 'pressure',
+      lightCue: event?.kind === 'breakdown-hit' ? 'hit' : 'build',
       zonePressure: { front: 86, center: 100, edge: 68, side: 76 },
     };
   }
