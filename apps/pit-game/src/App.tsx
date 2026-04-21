@@ -11,16 +11,22 @@ export function App() {
 
   return (
     <main className='app-shell app-shell--game'>
-      <button
-        type='button'
-        className='app-shell__lab-link'
-        onClick={() => {
-          setLabMounted(true);
-          setMode((current) => (current === 'lab' ? 'slice' : 'lab'));
-        }}
-      >
-        {mode === 'slice' ? 'Authoring Lab' : 'Back to Slice'}
-      </button>
+      {mode === 'slice' ? (
+        <button
+          type='button'
+          className='app-shell__lab-link'
+          onClick={() => {
+            setLabMounted(true);
+            setMode('lab');
+          }}
+        >
+          Authoring Lab
+        </button>
+      ) : (
+        <button type='button' className='app-shell__lab-link' disabled>
+          Lab Open
+        </button>
+      )}
 
       {mode === 'slice' ? <MinorityThreatShell /> : null}
       {labMounted ? (

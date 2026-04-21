@@ -37,19 +37,6 @@ body {
   color: #f6e8d1;
 }
 
-.app-shell__workspace {
-  display: grid;
-  gap: 18px;
-}
-
-.app-shell__panel {
-  display: grid;
-}
-
-.app-shell__panel--slice {
-  display: grid;
-}
-
 .minority-shell {
   min-height: 100vh;
 }

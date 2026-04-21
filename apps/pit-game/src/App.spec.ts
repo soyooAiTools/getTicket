@@ -90,7 +90,8 @@ describe('App mode switching', () => {
 
   it('boots into the playable slice and keeps the lab as a secondary control', () => {
     const view = renderApp();
-  const labShell = () => view.container.querySelector('[data-testid="prototype-workbench-shell"]');
+    const labShell = () =>
+      view.container.querySelector('[data-testid="prototype-workbench-shell"]');
     const labNote = () => view.container.querySelector('[data-testid="lab-note-value"]');
 
     expect(view.container.textContent).toContain('30-second playable slice');
@@ -102,11 +103,18 @@ describe('App mode switching', () => {
 
     expect(labShell()).not.toBeNull();
     expect(labShell()?.getAttribute('hidden')).toBeNull();
+    expect(view.container.textContent).toContain('Lab Open');
 
     clickButton(view.container, 'Set lab note');
     expect(labNote()?.textContent).toBe('persist me');
 
-    clickButton(view.container, 'Back to Slice');
+    const workbench = view.container.querySelector('[data-testid="prototype-workbench"]');
+
+    if (!workbench) {
+      throw new Error('Could not find prototype workbench');
+    }
+
+    clickButton(workbench as HTMLElement, 'Back to Slice');
 
     expect(labShell()).not.toBeNull();
     expect(labShell()?.getAttribute('hidden')).toBe('');

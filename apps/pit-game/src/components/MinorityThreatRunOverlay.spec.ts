@@ -67,4 +67,41 @@ describe('MinorityThreatRunOverlay', () => {
 
     view.unmount();
   });
+
+  it('keeps start gated until the slice is ready and disables it while running', () => {
+    const idle = renderOverlay({
+      canStart: false,
+      isRunning: false,
+    });
+
+    const idleStartButton = Array.from(idle.container.querySelectorAll('button')).find(
+      (candidate) => candidate.textContent === 'Start Slice',
+    );
+
+    if (!(idleStartButton instanceof HTMLButtonElement)) {
+      throw new Error('Could not find idle Start Slice button');
+    }
+
+    expect(idleStartButton.disabled).toBe(true);
+    expect(idle.container.textContent).not.toContain('Running...');
+    idle.unmount();
+
+    const running = renderOverlay({
+      canStart: true,
+      isRunning: true,
+    });
+
+    expect(running.container.textContent).toContain('Running...');
+
+    const runningStartButton = Array.from(running.container.querySelectorAll('button')).find(
+      (candidate) => candidate.textContent === 'Running...',
+    );
+
+    if (!(runningStartButton instanceof HTMLButtonElement)) {
+      throw new Error('Could not find running button');
+    }
+
+    expect(runningStartButton.disabled).toBe(true);
+    running.unmount();
+  });
 });
