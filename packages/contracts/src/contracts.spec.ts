@@ -13,7 +13,7 @@ import {
   loadTestRunDefinitionSchema,
   networkProfileSchema,
   miniappSessionSchema,
-  wechatPaymentIntentSchema,
+  paymentIntentSchema,
   viewerSchema,
 } from './index';
 
@@ -306,13 +306,13 @@ describe('shared contracts', () => {
         token: 'session-token-123',
         customer: {
           id: 'cust_001',
-          openId: 'openid_abc123',
+          accountKey: 'customer_key_abc123',
         },
         expiresAt: '2026-04-24T09:30:00.000Z',
       }),
     ).toMatchObject({
       customer: {
-        openId: 'openid_abc123',
+        accountKey: 'customer_key_abc123',
       },
       token: 'session-token-123',
     });
@@ -324,7 +324,7 @@ describe('shared contracts', () => {
         token: 'session-token-123',
         customer: {
           id: 'cust_001',
-          openId: 'openid_abc123',
+          accountKey: 'customer_key_abc123',
           sessionKey: 'should-not-be-exposed',
         },
         expiresAt: '2026-04-24T09:30:00.000Z',
@@ -332,9 +332,9 @@ describe('shared contracts', () => {
     ).toThrow();
   });
 
-  it('validates the wechat payment intent contract', () => {
+  it('validates the generic payment intent contract', () => {
     expect(
-      wechatPaymentIntentSchema.parse({
+      paymentIntentSchema.parse({
         appId: 'wx-app-id',
         nonceStr: 'nonce',
         packageValue: 'prepay_id=wx123',

@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const miniappCustomerSchema = z
   .object({
     id: z.string().min(1),
-    openId: z.string().min(1),
+    accountKey: z.string().min(1),
   })
   .strict();
 

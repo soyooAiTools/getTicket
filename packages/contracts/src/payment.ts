@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const wechatPaymentIntentSchema = z
+export const paymentIntentSchema = z
   .object({
     appId: z.string().min(1),
     nonceStr: z.string().min(1),
@@ -11,4 +11,4 @@ export const wechatPaymentIntentSchema = z
   })
   .strict();
 
-export type WechatPaymentIntent = z.infer<typeof wechatPaymentIntentSchema>;
+export type PaymentIntent = z.infer<typeof paymentIntentSchema>;

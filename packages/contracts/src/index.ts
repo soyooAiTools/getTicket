@@ -70,6 +70,6 @@ export {
   type ValidationMode,
 } from './load-testing';
 export {
-  wechatPaymentIntentSchema,
-  type WechatPaymentIntent,
+  paymentIntentSchema,
+  type PaymentIntent,
 } from './payment';

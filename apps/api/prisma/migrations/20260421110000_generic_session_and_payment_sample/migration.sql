@@ -1,0 +1,4 @@
+ALTER TYPE "PaymentMethod" RENAME VALUE 'WECHAT_PAY' TO 'EXTERNAL_PROVIDER';
+
+ALTER TABLE "CustomerAccount"
+RENAME COLUMN "wechatOpenId" TO "accountKey";
