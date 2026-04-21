@@ -42,6 +42,7 @@ export interface VerticalSliceSession {
 
 const SCORED_WINDOW_KEYS = Symbol('vertical-slice-scored-window-keys');
 const MAX_STEP_SLICE_MS = 100;
+const PRESSURE_DAMAGE_PER_SECOND = 0.125;
 
 type VerticalSliceSessionState = VerticalSliceSession & {
   [SCORED_WINDOW_KEYS]: ReadonlySet<string>;
@@ -201,7 +202,7 @@ export function stepVerticalSliceSession(
   const seconds = safeDtMs / 1_000;
   const pressure = resolvePressureSeverity(current.frame, input.targetZone);
   const mitigation = resolveMitigation(current.frame, input.action);
-  const balanceLoss = Math.max(0, pressure - mitigation);
+  const balanceLoss = Math.max(0, pressure - mitigation) * seconds * PRESSURE_DAMAGE_PER_SECOND;
   const balance = Math.max(0, session.player.balance - balanceLoss);
   const staminaDrainPerSecond = input.action === 'idle' ? 8 : 16;
   const stamina = Math.max(0, session.player.stamina - staminaDrainPerSecond * seconds);
@@ -240,19 +241,21 @@ export function completeVerticalSliceSession(
   session: VerticalSliceSession,
   input: VerticalSliceInput = { action: 'idle', targetZone: session.player.zone },
 ): VerticalSliceSession {
-  if (session.completed) {
+  if (session.failed || session.completed) {
     return session;
   }
+
+  const playerFeedback = resolvePlayerPose(input.action, session.player.control);
 
   return {
     ...session,
     completed: true,
-    failed: false,
     frame: session.frame,
     player: {
       ...session.player,
       zone: input.targetZone,
-      pose: session.player.status === 'down' ? 'recover' : session.player.pose,
+      pose: playerFeedback.pose,
+      status: playerFeedback.status,
     },
     summary: {
       label: 'Survived',

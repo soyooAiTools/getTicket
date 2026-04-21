@@ -21,6 +21,7 @@ export interface VerticalSliceController {
 export function createVerticalSliceController(fixture: VerticalSliceFixture): VerticalSliceController {
   let snapshot = createVerticalSliceSession(fixture);
   let running = false;
+  let latestInput: VerticalSliceInput = { action: 'idle', targetZone: snapshot.player.zone };
   const listeners = new Set<(session: VerticalSliceSession) => void>();
 
   function publish() {
@@ -40,6 +41,7 @@ export function createVerticalSliceController(fixture: VerticalSliceFixture): Ve
         return;
       }
 
+      latestInput = input;
       const nextSnapshot = stepVerticalSliceSession(snapshot, input, dtMs);
 
       if (nextSnapshot === snapshot) {
@@ -69,7 +71,7 @@ export function createVerticalSliceController(fixture: VerticalSliceFixture): Ve
       publish();
     },
     complete() {
-      snapshot = completeVerticalSliceSession(snapshot);
+      snapshot = completeVerticalSliceSession(snapshot, latestInput);
       running = false;
       publish();
     },
@@ -79,6 +81,7 @@ export function createVerticalSliceController(fixture: VerticalSliceFixture): Ve
     reset() {
       snapshot = createVerticalSliceSession(fixture);
       running = false;
+      latestInput = { action: 'idle', targetZone: snapshot.player.zone };
       publish();
     },
   };
