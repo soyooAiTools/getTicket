@@ -1,7 +1,15 @@
 import { validateSongProfile, type ImpactMarker, type SongProfile } from './song-profile';
 
-export type VerticalSlicePhaseKind = 'tension-in' | 'breakdown-peak' | 'aftershock';
+export type VerticalSlicePhaseKind =
+  | 'walk-in-pressure'
+  | 'build'
+  | 'breakdown-peak'
+  | 'aftershock';
 export type VerticalSliceEventKind = 'crowd-build' | 'lateral-surge' | 'breakdown-hit' | 'aftershock-drop';
+export type VerticalSliceDangerKind = 'push' | 'surge' | 'crush' | 'aftershock';
+export type VerticalSliceRecommendedAction = 'move' | 'brace' | 'slip' | 'shove';
+export type VerticalSliceCameraCue = 'follow' | 'pressure' | 'impact' | 'down';
+export type VerticalSliceLightCue = 'room' | 'build' | 'hit' | 'aftershock';
 
 export interface VerticalSliceAudioSource {
   artist: string;
@@ -23,6 +31,21 @@ export interface VerticalSliceEvent {
   atMs: number;
   kind: VerticalSliceEventKind;
   strength: number;
+}
+
+export interface VerticalSliceFrame {
+  phase: VerticalSlicePhase;
+  event: VerticalSliceEvent | null;
+  dangerKind: VerticalSliceDangerKind;
+  recommendedAction: VerticalSliceRecommendedAction;
+  cameraCue: VerticalSliceCameraCue;
+  lightCue: VerticalSliceLightCue;
+  zonePressure: {
+    front: number;
+    center: number;
+    edge: number;
+    side: number;
+  };
 }
 
 export interface VerticalSliceFixture {
