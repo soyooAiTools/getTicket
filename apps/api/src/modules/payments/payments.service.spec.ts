@@ -698,7 +698,7 @@ describe('PaymentsService', () => {
       },
       create: {
         amount: 19900,
-        method: 'WECHAT_PAY',
+        method: 'EXTERNAL_PROVIDER',
         orderId: 'order_123',
         paidAt: expect.any(Date),
         providerTxnId: 'wx_txn_456',
@@ -706,7 +706,7 @@ describe('PaymentsService', () => {
       },
       update: {
         amount: 19900,
-        method: 'WECHAT_PAY',
+        method: 'EXTERNAL_PROVIDER',
         paidAt: expect.any(Date),
         status: 'SUCCEEDED',
       },
@@ -777,7 +777,7 @@ describe('PaymentsService', () => {
       },
       create: {
         amount: 19900,
-        method: 'WECHAT_PAY',
+        method: 'EXTERNAL_PROVIDER',
         orderId: 'order_123',
         paidAt: expect.any(Date),
         providerTxnId: 'wx_txn_456',
@@ -785,7 +785,7 @@ describe('PaymentsService', () => {
       },
       update: {
         amount: 19900,
-        method: 'WECHAT_PAY',
+        method: 'EXTERNAL_PROVIDER',
         paidAt: existingPaidAt,
         status: 'SUCCEEDED',
       },
@@ -889,7 +889,7 @@ describe('PaymentsService', () => {
       },
       create: {
         amount: 19900,
-        method: 'WECHAT_PAY',
+        method: 'EXTERNAL_PROVIDER',
         orderId: 'order_123',
         paidAt: expect.any(Date),
         providerTxnId: 'wx_txn_456',
@@ -897,7 +897,7 @@ describe('PaymentsService', () => {
       },
       update: {
         amount: 19900,
-        method: 'WECHAT_PAY',
+        method: 'EXTERNAL_PROVIDER',
         paidAt: expect.any(Date),
         status: 'REFUNDED',
       },
@@ -1227,7 +1227,7 @@ describe('PaymentsService', () => {
       },
       create: {
         amount: 19900,
-        method: 'WECHAT_PAY',
+        method: 'EXTERNAL_PROVIDER',
         orderId: 'order_123',
         paidAt: expect.any(Date),
         providerTxnId: 'wx_txn_456',
@@ -1235,7 +1235,7 @@ describe('PaymentsService', () => {
       },
       update: {
         amount: 19900,
-        method: 'WECHAT_PAY',
+        method: 'EXTERNAL_PROVIDER',
         paidAt: existingPaidAt,
         status: 'SUCCEEDED',
       },

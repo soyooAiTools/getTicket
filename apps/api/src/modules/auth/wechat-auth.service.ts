@@ -44,10 +44,10 @@ export class WechatAuthService {
     }
 
     const customer = await this.prisma.customerAccount.upsert({
-      where: { wechatOpenId: payload.openid },
+      where: { accountKey: payload.openid },
       update: {},
-      create: { wechatOpenId: payload.openid },
-      select: { id: true, wechatOpenId: true },
+      create: { accountKey: payload.openid },
+      select: { id: true, accountKey: true },
     });
 
     const token = randomBytes(24).toString('hex');
@@ -66,7 +66,7 @@ export class WechatAuthService {
       token,
       customer: {
         id: customer.id,
-        openId: customer.wechatOpenId,
+        accountKey: customer.accountKey,
       },
       expiresAt: expiresAt.toISOString(),
     };

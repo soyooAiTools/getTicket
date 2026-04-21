@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, Optional } from '@nestjs/common';
 import { PaymentMethod, PaymentStatus } from '@prisma/client';
 
 import { PrismaService } from '../../common/prisma/prisma.service';
-import type { WechatPaymentIntent } from '../../../../../packages/contracts/src';
+import type { PaymentIntent } from '../../../../../packages/contracts/src';
 
 import { FulfillmentEventsService } from '../fulfillment/fulfillment-events.service';
 import { ORDER_STATUS, type OrderStatus } from '../orders/order-status';
@@ -45,7 +45,7 @@ export class PaymentsService {
 
   async createWechatIntent(
     input: CreateWechatIntentInput,
-  ): Promise<WechatPaymentIntent> {
+  ): Promise<PaymentIntent> {
     const order = await this.prisma.order.findFirst({
       include: {
         items: {
@@ -192,7 +192,7 @@ export class PaymentsService {
           },
           create: {
             amount,
-            method: PaymentMethod.WECHAT_PAY,
+            method: PaymentMethod.EXTERNAL_PROVIDER,
             orderId,
             paidAt,
             providerTxnId,
@@ -200,7 +200,7 @@ export class PaymentsService {
           },
           update: {
             amount,
-            method: PaymentMethod.WECHAT_PAY,
+            method: PaymentMethod.EXTERNAL_PROVIDER,
             paidAt,
             status: paymentStatus,
           },

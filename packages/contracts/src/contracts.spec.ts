@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  controlRunDraftSchema,
+  controlRunRecordSchema,
   calibrationReportSchema,
   customerIdentitySchema,
   customerSessionSchema,
@@ -11,12 +13,49 @@ import {
   orderDetailSchema,
   orderListItemSchema,
   orderTimelineItemSchema,
+  liveRunSnapshotSchema,
+  nodeHealthStatusSchema,
+  nodePoolSchema,
+  nodeTelemetrySampleSchema,
   ticketTierSummarySchema,
   loadTestRunDefinitionSchema,
   networkProfileSchema,
+  runStatusSchema,
+  scenarioTemplateSchema,
   paymentIntentSchema,
   viewerSchema,
 } from './index';
+
+const sampleTicketTask = {
+  event: {
+    platform: '大麦',
+    eventName: '周杰伦嘉年华世界巡回演唱会',
+    city: '上海',
+    venue: '上海体育场',
+    sessionLabel: '2026-05-01 19:30',
+    saleStartsAt: '2026-04-25T12:00:00.000Z',
+  },
+  ticket: {
+    tierLabel: '内场票',
+    priceLabel: '980元',
+    zoneLabel: 'A区',
+    quantity: 2,
+  },
+  nodeStrategy: {
+    poolId: 'pool-control-01',
+    launchMode: 'SYNC_WITH_JITTER',
+    preferredRegions: ['hk'],
+    expectedNodeCount: 6,
+  },
+  executionStrategy: {
+    objective: 'FULL_SUBMIT',
+    prewarmSeconds: 30,
+    workerLaunchIntervalMs: 1000,
+    queuePollIntervalMs: 1500,
+    lockRetryLimit: 3,
+    orderSubmitLimit: 2,
+  },
+} as const;
 
 describe('shared contracts', () => {
   it('validates an event summary payload', () => {
@@ -366,11 +405,13 @@ describe('shared contracts', () => {
         id: 'run_preprod_20260417_001',
         mode: 'PREPROD',
         targetBaseUrl: 'https://preprod-api.example.com',
+        inventoryPoolId: 'inventory-main',
         maxGlobalQps: 2400,
         maxNodeConcurrency: 180,
         tags: {
           test_run_id: 'run_preprod_20260417_001',
         },
+        ticketTask: sampleTicketTask,
         requestTemplates: {
           query: {
             method: 'GET',
@@ -444,6 +485,14 @@ describe('shared contracts', () => {
     ).toMatchObject({
       mode: 'PREPROD',
       maxGlobalQps: 2400,
+      ticketTask: {
+        event: {
+          eventName: '周杰伦嘉年华世界巡回演唱会',
+        },
+        executionStrategy: {
+          objective: 'FULL_SUBMIT',
+        },
+      },
     });
   });
 
@@ -459,6 +508,371 @@ describe('shared contracts', () => {
     ).toMatchObject({
       id: 'hk-anchor',
       baseLatencyMs: 18,
+    });
+  });
+
+  it('validates a scenario template payload', () => {
+    expect(
+      scenarioTemplateSchema.parse({
+        id: 'template-preprod-01',
+        name: '预发开售窗口演练',
+        description: '用于完整开售链路的预发演练模板。',
+        definition: {
+          mode: 'PREPROD',
+          targetBaseUrl: 'https://preprod-api.example.com',
+          inventoryPoolId: 'inventory-main',
+          maxGlobalQps: 2400,
+          maxNodeConcurrency: 180,
+          tags: {
+            cohort: 'release-window',
+          },
+          ticketTask: sampleTicketTask,
+          requestTemplates: {
+            query: {
+              method: 'GET',
+              path: '/api/catalog/events',
+              timeoutMs: 1500,
+            },
+            queue: {
+              method: 'GET',
+              path: '/api/queue/status',
+              timeoutMs: 1500,
+            },
+            inventoryLock: {
+              method: 'POST',
+              path: '/api/checkout/draft-orders',
+              timeoutMs: 2500,
+            },
+            orderSubmit: {
+              method: 'POST',
+              path: '/api/orders/submit',
+              timeoutMs: 2500,
+            },
+          },
+          phases: [
+            {
+              id: 'warmup',
+              startsAtOffsetMs: 0,
+              durationMs: 1500000,
+              queryConcurrency: 30,
+              queuePollingConcurrency: 0,
+              inventoryLockConcurrency: 0,
+              orderSubmissionConcurrency: 0,
+            },
+          ],
+        },
+      }),
+    ).toMatchObject({
+      id: 'template-preprod-01',
+      definition: {
+        mode: 'PREPROD',
+        ticketTask: {
+          ticket: {
+            tierLabel: '内场票',
+          },
+        },
+      },
+    });
+  });
+
+  it('rejects a scenario template payload without a description', () => {
+    expect(() =>
+      scenarioTemplateSchema.parse({
+        id: 'template-preprod-01',
+        name: 'Preprod release window',
+        definition: {
+          mode: 'PREPROD',
+          targetBaseUrl: 'https://preprod-api.example.com',
+          inventoryPoolId: 'inventory-main',
+          maxGlobalQps: 2400,
+          maxNodeConcurrency: 180,
+          tags: {
+            cohort: 'release-window',
+          },
+          requestTemplates: {
+            query: {
+              method: 'GET',
+              path: '/api/catalog/events',
+              timeoutMs: 1500,
+            },
+            queue: {
+              method: 'GET',
+              path: '/api/queue/status',
+              timeoutMs: 1500,
+            },
+            inventoryLock: {
+              method: 'POST',
+              path: '/api/checkout/draft-orders',
+              timeoutMs: 2500,
+            },
+            orderSubmit: {
+              method: 'POST',
+              path: '/api/orders/submit',
+              timeoutMs: 2500,
+            },
+          },
+          phases: [
+            {
+              id: 'warmup',
+              startsAtOffsetMs: 0,
+              durationMs: 1500000,
+              queryConcurrency: 30,
+              queuePollingConcurrency: 0,
+              inventoryLockConcurrency: 0,
+              orderSubmissionConcurrency: 0,
+            },
+          ],
+        },
+      }),
+    ).toThrow();
+  });
+
+  it('validates a node pool payload', () => {
+    expect(
+      nodePoolSchema.parse({
+        id: 'pool-hk-anchor',
+        name: 'Hong Kong anchor pool',
+        region: 'hk',
+        role: 'ANCHOR',
+        maxNodes: 3,
+        nodeIds: ['node-hk-1', 'node-hk-2'],
+      }),
+    ).toMatchObject({
+      id: 'pool-hk-anchor',
+      maxNodes: 3,
+      nodeIds: ['node-hk-1', 'node-hk-2'],
+    });
+  });
+
+  it('rejects a node pool payload with a non-positive maxNodes value', () => {
+    expect(() =>
+      nodePoolSchema.parse({
+        id: 'pool-hk-anchor',
+        name: 'Hong Kong anchor pool',
+        region: 'hk',
+        role: 'ANCHOR',
+        maxNodes: 0,
+        nodeIds: ['node-hk-1'],
+      }),
+    ).toThrow();
+  });
+
+  it('validates a control run draft payload', () => {
+    expect(
+      controlRunDraftSchema.parse({
+        id: 'run-control-01',
+        templateId: 'template-preprod-01',
+        nodePoolId: 'pool-hk-anchor',
+        definition: {
+          id: 'run-control-01',
+          mode: 'PREPROD',
+          targetBaseUrl: 'https://preprod-api.example.com',
+          inventoryPoolId: 'inventory-main',
+          maxGlobalQps: 2400,
+          maxNodeConcurrency: 180,
+          tags: {
+            release: '2026-04-18',
+          },
+          ticketTask: sampleTicketTask,
+          requestTemplates: {
+            query: {
+              method: 'GET',
+              path: '/api/catalog/events',
+              timeoutMs: 1500,
+            },
+            queue: {
+              method: 'GET',
+              path: '/api/queue/status',
+              timeoutMs: 1500,
+            },
+            inventoryLock: {
+              method: 'POST',
+              path: '/api/checkout/draft-orders',
+              timeoutMs: 2500,
+            },
+            orderSubmit: {
+              method: 'POST',
+              path: '/api/orders/submit',
+              timeoutMs: 2500,
+            },
+          },
+          phases: [
+            {
+              id: 'warmup',
+              startsAtOffsetMs: 0,
+              durationMs: 1500000,
+              queryConcurrency: 30,
+              queuePollingConcurrency: 0,
+              inventoryLockConcurrency: 0,
+              orderSubmissionConcurrency: 0,
+            },
+          ],
+        },
+      }),
+    ).toMatchObject({
+      id: 'run-control-01',
+      templateId: 'template-preprod-01',
+      definition: {
+        ticketTask: {
+          nodeStrategy: {
+            poolId: 'pool-control-01',
+          },
+        },
+      },
+    });
+  });
+
+  it('rejects a control run draft payload when draft.id mismatches definition.id', () => {
+    expect(() =>
+      controlRunDraftSchema.parse({
+        id: 'run-control-01',
+        templateId: 'template-preprod-01',
+        nodePoolId: 'pool-hk-anchor',
+        definition: {
+          id: 'run-control-02',
+          mode: 'PREPROD',
+          targetBaseUrl: 'https://preprod-api.example.com',
+          inventoryPoolId: 'inventory-main',
+          maxGlobalQps: 2400,
+          maxNodeConcurrency: 180,
+          tags: {
+            release: '2026-04-18',
+          },
+          requestTemplates: {
+            query: {
+              method: 'GET',
+              path: '/api/catalog/events',
+              timeoutMs: 1500,
+            },
+            queue: {
+              method: 'GET',
+              path: '/api/queue/status',
+              timeoutMs: 1500,
+            },
+            inventoryLock: {
+              method: 'POST',
+              path: '/api/checkout/draft-orders',
+              timeoutMs: 2500,
+            },
+            orderSubmit: {
+              method: 'POST',
+              path: '/api/orders/submit',
+              timeoutMs: 2500,
+            },
+          },
+          phases: [
+            {
+              id: 'warmup',
+              startsAtOffsetMs: 0,
+              durationMs: 1500000,
+              queryConcurrency: 30,
+              queuePollingConcurrency: 0,
+              inventoryLockConcurrency: 0,
+              orderSubmissionConcurrency: 0,
+            },
+          ],
+        },
+      }),
+    ).toThrow('Run draft id must match definition.id.');
+  });
+
+  it('validates a control run record payload', () => {
+    expect(
+      controlRunRecordSchema.parse({
+        id: 'run-control-01',
+        templateId: 'template-preprod-01',
+        nodePoolId: 'pool-hk-anchor',
+        mode: 'PREPROD',
+        targetBaseUrl: 'https://preprod-api.example.com',
+        status: 'RUNNING',
+        tags: {
+          release: '2026-04-18',
+        },
+        ticketTask: sampleTicketTask,
+        createdAt: '2026-04-18T09:30:00.000Z',
+        updatedAt: '2026-04-18T09:35:00.000Z',
+      }),
+    ).toMatchObject({
+      status: 'RUNNING',
+      nodePoolId: 'pool-hk-anchor',
+      ticketTask: {
+        executionStrategy: {
+          objective: 'FULL_SUBMIT',
+        },
+      },
+    });
+  });
+
+  it('validates a node health status payload through the planned symbol', () => {
+    expect(nodeHealthStatusSchema.parse('ONLINE')).toBe('ONLINE');
+    expect(nodeHealthStatusSchema.parse('DEGRADED')).toBe('DEGRADED');
+    expect(nodeHealthStatusSchema.parse('OFFLINE')).toBe('OFFLINE');
+    expect(nodeHealthStatusSchema.parse('BUSY')).toBe('BUSY');
+    expect(runStatusSchema.parse('PLANNED')).toBe('PLANNED');
+    expect(runStatusSchema.parse('STOPPING')).toBe('STOPPING');
+    expect(runStatusSchema.parse('STOPPED')).toBe('STOPPED');
+  });
+
+  it('validates a node telemetry sample payload', () => {
+    expect(
+      nodeTelemetrySampleSchema.parse({
+        runId: 'run-control-01',
+        nodeId: 'node-hk-1',
+        phaseId: null,
+        status: 'BUSY',
+        qps: 218.5,
+        errorRate: 0.012,
+        p95LatencyMs: 240,
+        activeWorkers: 28,
+        recordedAt: '2026-04-18T09:40:00.000Z',
+      }),
+    ).toMatchObject({
+      runId: 'run-control-01',
+      phaseId: null,
+      status: 'BUSY',
+      qps: 218.5,
+    });
+  });
+
+  it('validates a live run snapshot payload', () => {
+    expect(
+      liveRunSnapshotSchema.parse({
+        runId: 'run-control-01',
+        status: 'RUNNING',
+        currentPhaseId: null,
+        aggregateQps: 218.5,
+        aggregateErrorRate: 0.012,
+        aggregateP95LatencyMs: 240,
+        activeNodeCount: 1,
+        unhealthyNodeCount: 0,
+        nodes: [
+          {
+            nodeId: 'node-hk-1',
+            region: 'hk',
+            role: 'CONTROL',
+            status: 'DEGRADED',
+            phaseId: null,
+            qps: 218.5,
+            errorRate: 0.012,
+            p95LatencyMs: 240,
+            activeWorkers: 28,
+            recordedAt: '2026-04-18T09:40:00.000Z',
+          },
+        ],
+        alerts: [
+          {
+            id: 'alert-001',
+            severity: 'CRITICAL',
+            message: 'One node is degraded',
+            recordedAt: '2026-04-18T09:40:00.000Z',
+          },
+        ],
+        updatedAt: '2026-04-18T09:40:00.000Z',
+      }),
+    ).toMatchObject({
+      runId: 'run-control-01',
+      status: 'RUNNING',
+      currentPhaseId: null,
     });
   });
 

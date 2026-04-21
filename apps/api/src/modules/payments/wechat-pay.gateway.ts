@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { createSign, randomBytes } from 'crypto';
 
-import type { WechatPaymentIntent } from '../../../../../packages/contracts/src';
+import type { PaymentIntent } from '../../../../../packages/contracts/src';
 
 export type CreateJsapiIntentInput = {
   amount: number;
@@ -67,7 +67,7 @@ export class WechatPayGateway {
 
   async createJsapiIntent(
     input: CreateJsapiIntentInput,
-  ): Promise<WechatPaymentIntent> {
+  ): Promise<PaymentIntent> {
     const appId = process.env.WECHAT_APP_ID?.trim();
     const merchantId = process.env.WECHAT_MCH_ID?.trim();
 

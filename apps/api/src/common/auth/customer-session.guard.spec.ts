@@ -20,8 +20,8 @@ describe('CustomerSessionGuard', () => {
   it('accepts a valid bearer token and attaches the authenticated customer to the request', async () => {
     prismaMock.customerSession.findFirst = jest.fn().mockResolvedValue({
       customer: {
+        accountKey: 'openid_abc123',
         id: 'cust_123',
-        wechatOpenId: 'openid_abc123',
       },
       expiresAt: new Date('2026-04-24T09:30:00.000Z'),
       id: 'session_123',
@@ -53,8 +53,8 @@ describe('CustomerSessionGuard', () => {
       include: {
         customer: {
           select: {
+            accountKey: true,
             id: true,
-            wechatOpenId: true,
           },
         },
       },

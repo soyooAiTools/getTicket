@@ -50,8 +50,8 @@ describe('WechatAuthService', () => {
       ok: true,
     });
     prismaMock.customerAccount.upsert = jest.fn().mockResolvedValue({
+      accountKey: 'openid_abc123',
       id: 'cust_001',
-      wechatOpenId: 'openid_abc123',
     });
     prismaMock.customerSession.create = jest.fn().mockResolvedValue({
       id: 'session_001',
@@ -84,15 +84,15 @@ describe('WechatAuthService', () => {
     expect(parsedUrl.searchParams.get('grant_type')).toBe('authorization_code');
     expect(prismaMock.customerAccount.upsert).toHaveBeenCalledWith({
       where: {
-        wechatOpenId: 'openid_abc123',
+        accountKey: 'openid_abc123',
       },
       update: {},
       create: {
-        wechatOpenId: 'openid_abc123',
+        accountKey: 'openid_abc123',
       },
       select: {
+        accountKey: true,
         id: true,
-        wechatOpenId: true,
       },
     });
     expect(prismaMock.customerSession.create).toHaveBeenCalledWith({
@@ -105,8 +105,8 @@ describe('WechatAuthService', () => {
     expect(result).toEqual({
       token: rawToken,
       customer: {
+        accountKey: 'openid_abc123',
         id: 'cust_001',
-        openId: 'openid_abc123',
       },
       expiresAt: expectedExpiresAt,
     });
@@ -167,8 +167,8 @@ describe('WechatAuthService', () => {
     const loginWithCode = jest.fn().mockResolvedValue({
       token: 'session-token-123',
       customer: {
+        accountKey: 'openid_abc123',
         id: 'cust_001',
-        openId: 'openid_abc123',
       },
       expiresAt: '2026-04-24T09:30:00.000Z',
     });
@@ -178,8 +178,8 @@ describe('WechatAuthService', () => {
 
     await expect(controller.login({ code: ' auth-code-123 ' })).resolves.toEqual({
       customer: {
+        accountKey: 'openid_abc123',
         id: 'cust_001',
-        openId: 'openid_abc123',
       },
       expiresAt: '2026-04-24T09:30:00.000Z',
       token: 'session-token-123',
