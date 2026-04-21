@@ -37,7 +37,6 @@ system-under-test.
 
 - The primary product boundary is `apps/api`, `apps/admin`, and
   `apps/load-control`.
-- The historical end-user miniapp is intentionally removed from this branch.
 - The API package uses Jest-based specs.
 - Shared and frontend packages use Vitest.
 - Root lint is a lightweight baseline pass over the workspace packages and

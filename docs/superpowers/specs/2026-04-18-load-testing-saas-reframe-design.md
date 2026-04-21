@@ -346,7 +346,7 @@ The current branch acceptance baseline for engineering handoff is:
 5. `fresh smoke`
    A fresh smoke run can complete end-to-end after stack bootstrap. Latest recorded acceptance run on `2026-04-21` is `run-handoff-smoke-20260421184833`, which completed with `18/18` successful requests, `1` assignment, `1` summary, and `6` resulting orders.
 6. `handoff boundary`
-   The engineering handoff boundary is the load-testing SaaS surface only: `apps/admin`, `apps/load-control`, `apps/api`, and `packages/contracts`. The historical miniapp is intentionally removed.
+   The engineering handoff boundary is the load-testing SaaS surface only: `apps/admin`, `apps/load-control`, `apps/api`, and `packages/contracts`.
 
 ## Risks
 

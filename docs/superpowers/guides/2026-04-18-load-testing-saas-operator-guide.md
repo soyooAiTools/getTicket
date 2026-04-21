@@ -201,6 +201,3 @@ For this branch, the active handoff boundary is:
 - `apps/load-control`
 - `apps/api`
 - `packages/contracts`
-
-The historical end-user miniapp is intentionally removed from this branch and
-is not part of the load-testing SaaS handoff surface.

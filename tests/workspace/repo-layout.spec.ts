@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 function readJson<T>(path: string): T {
@@ -27,8 +27,8 @@ describe('repo layout', () => {
     expect(existsSync('apps/load-control/package.json')).toBe(true);
     expect(existsSync('apps/load-control/prisma/schema.prisma')).toBe(true);
     expect(existsSync('apps/admin/package.json')).toBe(true);
-    expect(existsSync('apps/miniapp/package.json')).toBe(false);
     expect(existsSync('packages/contracts/package.json')).toBe(true);
+    expect(readdirSync('apps').sort()).toEqual(['admin', 'api', 'load-control']);
 
     const rootPackage = readJson<{
       name: string;
@@ -47,7 +47,11 @@ describe('repo layout', () => {
         lint: expect.stringContaining('eslint tests'),
       }),
     );
-    expect(rootPackage.scripts).not.toHaveProperty('dev:miniapp');
+    expect(
+      Object.keys(rootPackage.scripts ?? {})
+        .filter((script) => script.startsWith('dev:'))
+        .sort(),
+    ).toEqual(['dev:admin', 'dev:api', 'dev:load-control']);
     expect(rootPackage.scripts?.postinstall).toContain('pnpm --filter api prisma:generate');
     expect(rootPackage.scripts?.test).toContain('pnpm --filter load-control test');
     expect(rootPackage.scripts?.test).toContain('pnpm --filter load-control test:e2e');

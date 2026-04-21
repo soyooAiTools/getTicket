@@ -20,7 +20,7 @@ describe('AppRoutes', () => {
   it('renders the operator overview route inside the control shell', () => {
     const html = renderRoute('/overview');
 
-    expect(html).toContain('抢票测试操作台');
+    expect(html).toContain('抢票测试作战面板');
     expect(html).toContain('作战总览');
   });
 
@@ -29,5 +29,17 @@ describe('AppRoutes', () => {
 
     expect(html).toContain('任务作战台');
     expect(html).toContain('run-2026-04-18');
+  });
+
+  it('renders the runs route with a clean Chinese title', () => {
+    const html = renderRoute('/runs');
+
+    expect(html).toContain('抢票任务');
+  });
+
+  it('renders the nodes route with a clean Chinese title', () => {
+    const html = renderRoute('/nodes');
+
+    expect(html).toContain('节点池');
   });
 });

@@ -15,7 +15,6 @@ Active engineering boundary:
 
 Explicitly out of scope:
 
-- the historical end-user miniapp
 - older ticketing-product design docs that predate the SaaS reframe
 
 ## What Was Closed Before Handoff
@@ -101,7 +100,6 @@ corepack pnpm exec vitest run tests/workspace/local-stack-launchers.spec.ts test
 - the seeded local draft run is `run-local-demo-01`
 - `LOAD_TEST_INTERNAL_SECRET` must match across the API and the agent
 - the probe intentionally treats unauthorized responses as real failures
-- the historical miniapp is intentionally absent; this is not an accidental deletion
 
 ## Known Constraints
 
