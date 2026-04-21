@@ -481,7 +481,7 @@ describe('MinorityThreatShell', () => {
     await view.unmount();
   });
 
-  it('completes the run when playback crosses the authored segment end', async () => {
+  it('does not complete the run when playback crosses the authored segment end before play starts', async () => {
     const view = await renderShell();
     const input = getFileInput(view.container);
 
@@ -498,8 +498,8 @@ describe('MinorityThreatShell', () => {
       }
     });
 
-    expect(shellFixtures.completeSpy).toHaveBeenCalledTimes(1);
-    expect(view.container.textContent).toContain('Replay Slice');
+    expect(shellFixtures.completeSpy).not.toHaveBeenCalled();
+    expect(view.container.textContent).not.toContain('Run Complete');
 
     await view.unmount();
   });

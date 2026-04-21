@@ -96,7 +96,7 @@ export function MinorityThreatShell() {
     const handlePause = () => controller.pause();
 
     const handleTimeUpdate = () => {
-      if (audio.currentTime < sliceEndSeconds) {
+      if (!controller.isRunning() || audio.currentTime < sliceEndSeconds) {
         return;
       }
 
