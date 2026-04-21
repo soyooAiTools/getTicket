@@ -160,12 +160,28 @@ function stepVerticalSliceSessionSlice(
   }
 
   const hitWindows = session.hitWindows + (isNewHitWindow ? 1 : 0);
+  const seconds = dtMs / 1_000;
+  const pressure = resolvePressureSeverity(frame, input.targetZone);
+  const mitigation = resolveMitigation(frame, input.action);
+  const balanceLoss = Math.max(0, pressure - mitigation) * seconds * PRESSURE_DAMAGE_PER_SECOND;
+  const balance = Math.max(0, session.player.balance - balanceLoss);
+  const staminaDrainPerSecond = input.action === 'idle' ? 8 : 16;
+  const stamina = Math.max(0, session.player.stamina - staminaDrainPerSecond * seconds);
 
   return {
     ...session,
     elapsedMs,
     frame,
     hitWindows,
+    player: {
+      zone: input.targetZone,
+      stamina,
+      balance,
+      pose: session.player.pose,
+      status: session.player.status,
+      control: session.player.control,
+    },
+    summary: null,
     [SCORED_WINDOW_KEYS]: scoredWindowKeys,
   };
 }
@@ -193,20 +209,13 @@ export function stepVerticalSliceSession(
     const sliceMs = Math.min(remainingMs, MAX_STEP_SLICE_MS);
     current = stepVerticalSliceSessionSlice(current, input, sliceMs);
     remainingMs -= sliceMs;
-
-    if (current.failed || current.completed) {
-      break;
-    }
   }
 
   const seconds = safeDtMs / 1_000;
   const pressure = resolvePressureSeverity(current.frame, input.targetZone);
   const mitigation = resolveMitigation(current.frame, input.action);
   const balanceLoss = Math.max(0, pressure - mitigation) * seconds * PRESSURE_DAMAGE_PER_SECOND;
-  const balance = Math.max(0, session.player.balance - balanceLoss);
-  const staminaDrainPerSecond = input.action === 'idle' ? 8 : 16;
-  const stamina = Math.max(0, session.player.stamina - staminaDrainPerSecond * seconds);
-  const control = resolvePlayerControl(balanceLoss, balance);
+  const control = resolvePlayerControl(balanceLoss, current.player.balance);
   const playerFeedback = resolvePlayerPose(input.action, control);
   const failed = control === 'down';
   const completed = !failed && current.elapsedMs >= session.fixture.profile.durationMs;
@@ -219,9 +228,7 @@ export function stepVerticalSliceSession(
     failed,
     completed,
     player: {
-      zone: input.targetZone,
-      stamina,
-      balance,
+      ...current.player,
       pose: playerFeedback.pose,
       status: playerFeedback.status,
       control,

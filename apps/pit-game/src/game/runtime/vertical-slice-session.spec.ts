@@ -94,6 +94,23 @@ describe('vertical slice session pressure loop', () => {
     expect(longExposure.player.balance).toBeLessThan(shortExposure.player.balance);
   });
 
+  it('accumulates pressure across stepped phases instead of reusing only the ending frame', () => {
+    let singleStep = createVerticalSliceSession(minorityThreatVerticalSlice);
+    let phasedSteps = createVerticalSliceSession(minorityThreatVerticalSlice);
+
+    singleStep = stepVerticalSliceSession(singleStep, { action: 'move', targetZone: 'edge' }, 25_000);
+
+    phasedSteps = stepVerticalSliceSession(phasedSteps, { action: 'move', targetZone: 'edge' }, 4_000);
+    phasedSteps = stepVerticalSliceSession(phasedSteps, { action: 'move', targetZone: 'edge' }, 6_000);
+    phasedSteps = stepVerticalSliceSession(phasedSteps, { action: 'move', targetZone: 'edge' }, 14_000);
+    phasedSteps = stepVerticalSliceSession(phasedSteps, { action: 'move', targetZone: 'edge' }, 1_000);
+
+    expect(singleStep.elapsedMs).toBe(phasedSteps.elapsedMs);
+    expect(singleStep.frame.phase.kind).toBe('aftershock');
+    expect(phasedSteps.frame.phase.kind).toBe('aftershock');
+    expect(singleStep.player.balance).toBeCloseTo(phasedSteps.player.balance, 6);
+  });
+
   it('does not convert a failed run into a survived completion', () => {
     let session = createVerticalSliceSession(minorityThreatVerticalSlice);
 
