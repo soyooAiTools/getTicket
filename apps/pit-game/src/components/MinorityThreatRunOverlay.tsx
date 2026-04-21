@@ -42,7 +42,6 @@ export function MinorityThreatRunOverlay({
       <p className='slice-overlay__eyebrow'>Minority Threat</p>
       <h1>30-second playable slice</h1>
       <p>Dirty livehouse pressure. Shoulder camera. One authored breakdown run.</p>
-      <p>Finish the segment clean and jump straight back in with Replay Slice.</p>
       <p className='slice-overlay__file'>{fileName}</p>
       {loadedFileName ? <p className='slice-overlay__loaded'>Loaded: {loadedFileName}</p> : null}
       <div className='slice-overlay__actions'>

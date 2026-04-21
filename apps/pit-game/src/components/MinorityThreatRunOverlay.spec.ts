@@ -51,7 +51,6 @@ describe('MinorityThreatRunOverlay', () => {
 
     expect(view.container.textContent).toContain('Minority Threat');
     expect(view.container.textContent).toContain('30-second playable slice');
-    expect(view.container.textContent).toContain('Replay Slice');
     expect(view.container.textContent).toContain('Load Minority Threat.mp3');
     expect(view.container.textContent).not.toContain('C:/Users/Nick/Desktop');
 
