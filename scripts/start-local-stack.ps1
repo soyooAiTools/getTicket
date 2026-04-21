@@ -38,6 +38,7 @@ if (-not $statusBeforeStart.DockerReachable) {
 }
 
 Invoke-LocalStackCommand -WorkingDirectory (Get-LocalStackRepoRoot) -Command ('docker compose -f "' + (Get-LocalStackComposeFile) + '" up -d')
+Wait-LocalStackInfrastructureReady
 Ensure-LocalStackDependencies
 Ensure-LocalStackDatabase
 

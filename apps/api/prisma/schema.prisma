@@ -46,7 +46,7 @@ enum PaymentStatus {
 
 enum PaymentMethod {
   ALIPAY
-  WECHAT_PAY
+  EXTERNAL_PROVIDER
   BANK_CARD
 }
 
@@ -90,7 +90,7 @@ model Viewer {
 
 model CustomerAccount {
   id            String            @id @default(cuid())
-  wechatOpenId  String            @unique
+  accountKey    String            @unique
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
   sessions      CustomerSession[]

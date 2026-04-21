@@ -37,9 +37,7 @@ export function ReportsPage() {
       setReport(await getCalibrationReport(baselineRunId, productionRunId));
     } catch (loadError) {
       setError(
-        loadError instanceof Error
-          ? loadError.message
-          : '无法加载校准复盘。',
+        loadError instanceof Error ? loadError.message : '无法加载校准复盘。',
       );
     } finally {
       setLoading(false);
@@ -57,8 +55,7 @@ export function ReportsPage() {
           校准复盘
         </Typography.Title>
         <Typography.Paragraph style={{ marginBottom: 0 }}>
-          对比基线任务{' '}
-          <Typography.Text code>{baselineRunId ?? '-'}</Typography.Text>{' '}
+          对比基线任务 <Typography.Text code>{baselineRunId ?? '-'}</Typography.Text>{' '}
           与生产校准任务{' '}
           <Typography.Text code>{productionRunId ?? '-'}</Typography.Text>
           的结果。

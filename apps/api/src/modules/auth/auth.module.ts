@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 
 import { AuthController } from './auth.controller';
-import { WechatAuthService } from './wechat-auth.service';
+import { SessionBootstrapService } from './session-bootstrap.service';
 
 @Module({
   controllers: [AuthController],
-  providers: [WechatAuthService],
-  exports: [WechatAuthService],
+  providers: [SessionBootstrapService],
+  exports: [SessionBootstrapService],
 })
 export class AuthModule {}

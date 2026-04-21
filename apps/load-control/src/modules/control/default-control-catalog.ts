@@ -3,22 +3,22 @@ import type { NodePool, ScenarioTemplate, TicketTask } from '@ticketing/contract
 const defaultRequestTemplates = {
   query: {
     method: 'GET' as const,
-    path: '/catalog',
+    path: '/catalog/events',
     timeoutMs: 500,
   },
   queue: {
-    method: 'POST' as const,
-    path: '/queue',
+    method: 'GET' as const,
+    path: '/catalog/events',
     timeoutMs: 500,
   },
   inventoryLock: {
     method: 'POST' as const,
-    path: '/inventory/lock',
+    path: '/orders/draft',
     timeoutMs: 500,
   },
   orderSubmit: {
     method: 'POST' as const,
-    path: '/orders',
+    path: '/orders/draft',
     timeoutMs: 500,
   },
 };

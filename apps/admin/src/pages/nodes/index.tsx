@@ -43,9 +43,7 @@ export function NodesPage() {
       setNodes(nextNodes);
     } catch (loadError) {
       setError(
-        loadError instanceof Error
-          ? loadError.message
-          : '无法加载节点池信息。',
+        loadError instanceof Error ? loadError.message : '无法加载节点池信息。',
       );
     } finally {
       setLoading(false);

@@ -19,10 +19,15 @@ describe('repo layout', () => {
       ),
     ).toBe(true);
     expect(existsSync('apps/api/package.json')).toBe(true);
+    expect(
+      existsSync(
+        'apps/api/prisma/migrations/20260420162419_init_local/migration.sql',
+      ),
+    ).toBe(true);
     expect(existsSync('apps/load-control/package.json')).toBe(true);
     expect(existsSync('apps/load-control/prisma/schema.prisma')).toBe(true);
     expect(existsSync('apps/admin/package.json')).toBe(true);
-    expect(existsSync('apps/miniapp/package.json')).toBe(true);
+    expect(existsSync('apps/miniapp/package.json')).toBe(false);
     expect(existsSync('packages/contracts/package.json')).toBe(true);
 
     const rootPackage = readJson<{
@@ -39,10 +44,10 @@ describe('repo layout', () => {
         'dev:api': expect.stringContaining('pnpm --filter api dev'),
         'dev:load-control': expect.stringContaining('pnpm --filter load-control dev'),
         'dev:admin': expect.stringContaining('pnpm --filter admin dev'),
-        'dev:miniapp': expect.stringContaining('pnpm --filter miniapp dev:weapp'),
         lint: expect.stringContaining('eslint tests'),
       }),
     );
+    expect(rootPackage.scripts).not.toHaveProperty('dev:miniapp');
     expect(rootPackage.scripts?.postinstall).toContain('pnpm --filter api prisma:generate');
     expect(rootPackage.scripts?.test).toContain('pnpm --filter load-control test');
     expect(rootPackage.scripts?.test).toContain('pnpm --filter load-control test:e2e');
@@ -116,13 +121,6 @@ describe('repo layout', () => {
       lint: 'eslint src --ext .ts,.tsx',
     });
 
-    expect(readJson<{ scripts: Record<string, string> }>('apps/miniapp/package.json').scripts).toEqual({
-      'dev:weapp': 'taro build --type weapp --watch',
-      'build:weapp': 'taro build --type weapp',
-      test: 'vitest run',
-      lint: 'eslint src --ext .ts,.tsx',
-    });
-
     expect(readJson<{ scripts: Record<string, string> }>('packages/contracts/package.json').scripts).toEqual({
       test: 'vitest run',
       lint: 'eslint src --ext .ts',
@@ -132,5 +130,16 @@ describe('repo layout', () => {
     expect(workspace).toContain('apps/*');
     expect(workspace).toContain('packages/*');
     expect(workspace).toContain('tests/*');
+
+    const apiInitLocalMigration = readFileSync(
+      'apps/api/prisma/migrations/20260420162419_init_local/migration.sql',
+      'utf8',
+    );
+    expect(apiInitLocalMigration).toContain('CREATE TABLE "CustomerAccount"');
+    expect(apiInitLocalMigration).toContain('"wechatOpenId" TEXT NOT NULL');
+    expect(apiInitLocalMigration).toContain('CREATE TABLE "CustomerSession"');
+    expect(apiInitLocalMigration).toContain('ALTER TABLE "Event"');
+    expect(apiInitLocalMigration).toContain('ADD COLUMN "published"');
+    expect(apiInitLocalMigration).toContain('ADD COLUMN "refundEntryEnabled"');
   });
 });

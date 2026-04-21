@@ -116,6 +116,77 @@ describe('ControlService', () => {
     expect(service.listNodes()).toEqual([nodeRegistration]);
   });
 
+  it('persists planned nodes before saving assignments for repository-backed runs', async () => {
+    const now = '2026-04-21T00:00:00.000Z';
+    const controlRepository = {
+      getRun: jest.fn().mockResolvedValue(null),
+      createRunDraft: jest.fn().mockResolvedValue({
+        id: 'run-01',
+        templateId: 'template-preprod-01',
+        nodePoolId: 'pool-control-01',
+        mode: 'PREPROD',
+        targetBaseUrl: runDefinition.targetBaseUrl,
+        status: 'DRAFT',
+        tags: runDefinition.tags,
+        createdAt: now,
+        updatedAt: now,
+      }),
+      upsertNode: jest.fn().mockResolvedValue({
+        id: nodeRegistration.id,
+      }),
+      saveAssignments: jest.fn().mockResolvedValue(undefined),
+      updateRunStatus: jest.fn().mockResolvedValue({
+        id: 'run-01',
+        templateId: 'template-preprod-01',
+        nodePoolId: 'pool-control-01',
+        mode: 'PREPROD',
+        targetBaseUrl: runDefinition.targetBaseUrl,
+        status: 'PLANNED',
+        tags: runDefinition.tags,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    };
+    const service = new ControlService(
+      undefined,
+      undefined,
+      controlRepository as never,
+    );
+
+    service.registerNode(nodeRegistration);
+    await service.createRun({
+      id: 'run-01',
+      templateId: 'template-preprod-01',
+      nodePoolId: 'pool-control-01',
+      definition: runDefinition,
+    });
+    await service.planRun('run-01');
+
+    expect(controlRepository.upsertNode).toHaveBeenCalledWith({
+      id: 'node-01',
+      poolId: 'pool-control-01',
+      region: 'ap-southeast-1',
+      role: 'CONTROL',
+      healthStatus: 'ONLINE',
+      maxConcurrency: 12,
+      networkProfile: nodeRegistration.networkProfile,
+      labels: {},
+      lastSeenAt: expect.any(Date),
+    });
+    expect(controlRepository.saveAssignments).toHaveBeenCalledWith(
+      'run-01',
+      expect.arrayContaining([
+        expect.objectContaining({
+          runId: 'run-01',
+          nodeId: 'node-01',
+        }),
+      ]),
+    );
+    expect(controlRepository.upsertNode.mock.invocationCallOrder[0]).toBeLessThan(
+      controlRepository.saveAssignments.mock.invocationCallOrder[0],
+    );
+  });
+
   it('createRun stores a draft run snapshot', async () => {
     const service = new ControlService();
 

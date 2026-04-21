@@ -96,10 +96,10 @@ INSERT INTO load_control."ScenarioTemplate" (
         }
       },
       "requestTemplates": {
-        "query": { "method": "GET", "path": "/catalog", "timeoutMs": 500 },
-        "queue": { "method": "POST", "path": "/queue", "timeoutMs": 500 },
-        "inventoryLock": { "method": "POST", "path": "/inventory/lock", "timeoutMs": 500 },
-        "orderSubmit": { "method": "POST", "path": "/orders", "timeoutMs": 500 }
+        "query": { "method": "GET", "path": "/catalog/events", "timeoutMs": 500 },
+        "queue": { "method": "GET", "path": "/catalog/events", "timeoutMs": 500 },
+        "inventoryLock": { "method": "POST", "path": "/orders/draft", "timeoutMs": 500 },
+        "orderSubmit": { "method": "POST", "path": "/orders/draft", "timeoutMs": 500 }
       },
       "phases": [
         {
@@ -157,10 +157,10 @@ INSERT INTO load_control."ScenarioTemplate" (
         }
       },
       "requestTemplates": {
-        "query": { "method": "GET", "path": "/catalog", "timeoutMs": 500 },
-        "queue": { "method": "POST", "path": "/queue", "timeoutMs": 500 },
-        "inventoryLock": { "method": "POST", "path": "/inventory/lock", "timeoutMs": 500 },
-        "orderSubmit": { "method": "POST", "path": "/orders", "timeoutMs": 500 }
+        "query": { "method": "GET", "path": "/catalog/events", "timeoutMs": 500 },
+        "queue": { "method": "GET", "path": "/catalog/events", "timeoutMs": 500 },
+        "inventoryLock": { "method": "POST", "path": "/orders/draft", "timeoutMs": 500 },
+        "orderSubmit": { "method": "POST", "path": "/orders/draft", "timeoutMs": 500 }
       },
       "phases": [
         {
@@ -219,10 +219,10 @@ INSERT INTO load_control."ScenarioTemplate" (
         }
       },
       "requestTemplates": {
-        "query": { "method": "GET", "path": "/catalog", "timeoutMs": 500 },
-        "queue": { "method": "POST", "path": "/queue", "timeoutMs": 500 },
-        "inventoryLock": { "method": "POST", "path": "/inventory/lock", "timeoutMs": 500 },
-        "orderSubmit": { "method": "POST", "path": "/orders", "timeoutMs": 500 }
+        "query": { "method": "GET", "path": "/catalog/events", "timeoutMs": 500 },
+        "queue": { "method": "GET", "path": "/catalog/events", "timeoutMs": 500 },
+        "inventoryLock": { "method": "POST", "path": "/orders/draft", "timeoutMs": 500 },
+        "orderSubmit": { "method": "POST", "path": "/orders/draft", "timeoutMs": 500 }
       },
       "phases": [
         {
@@ -254,13 +254,12 @@ ON CONFLICT ("id") DO UPDATE SET
   "definition" = EXCLUDED."definition",
   "updatedAt" = NOW();
 
-DELETE FROM load_control."LoadControlRun"
-WHERE "id" IN (
-  'run-preprod-1',
-  'run-preprod-2',
-  'run-preprod-3',
-  'run-ticket-task-demo-2026-04-21-0216'
-);
+TRUNCATE TABLE
+  load_control."LoadControlTelemetrySample",
+  load_control."LoadControlSummary",
+  load_control."LoadControlAssignment",
+  load_control."LoadControlNode",
+  load_control."LoadControlRun";
 
 INSERT INTO load_control."LoadControlRun" (
   "id",
@@ -321,10 +320,10 @@ INSERT INTO load_control."LoadControlRun" (
       }
     },
     "requestTemplates": {
-      "query": { "method": "GET", "path": "/catalog", "timeoutMs": 500 },
-      "queue": { "method": "POST", "path": "/queue", "timeoutMs": 500 },
-      "inventoryLock": { "method": "POST", "path": "/inventory/lock", "timeoutMs": 500 },
-      "orderSubmit": { "method": "POST", "path": "/orders", "timeoutMs": 500 }
+        "query": { "method": "GET", "path": "/catalog/events", "timeoutMs": 500 },
+        "queue": { "method": "GET", "path": "/catalog/events", "timeoutMs": 500 },
+        "inventoryLock": { "method": "POST", "path": "/orders/draft", "timeoutMs": 500 },
+        "orderSubmit": { "method": "POST", "path": "/orders/draft", "timeoutMs": 500 }
     },
     "phases": [
       {

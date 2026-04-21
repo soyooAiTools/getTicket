@@ -1,14 +1,14 @@
 import { z } from 'zod';
 
-export const wechatPaymentIntentSchema = z
+export const paymentIntentSchema = z
   .object({
-    appId: z.string().min(1),
-    nonceStr: z.string().min(1),
-    packageValue: z.string().min(1),
-    paySign: z.string().min(1),
-    signType: z.enum(['RSA', 'MD5', 'HMAC-SHA256']),
-    timeStamp: z.string().min(1),
+    paymentId: z.string().min(1),
+    orderId: z.string().min(1),
+    method: z.enum(['EXTERNAL_PROVIDER']),
+    status: z.enum(['PENDING']),
+    intentToken: z.string().min(1),
+    expiresAt: z.string().datetime(),
   })
   .strict();
 
-export type WechatPaymentIntent = z.infer<typeof wechatPaymentIntentSchema>;
+export type PaymentIntent = z.infer<typeof paymentIntentSchema>;

@@ -249,7 +249,7 @@ export function RunDetailPageView({
             {
               dataIndex: 'inventoryLockConcurrency',
               key: 'inventoryLockConcurrency',
-              title: '锁库存',
+              title: '锁库',
             },
             {
               dataIndex: 'orderSubmissionConcurrency',

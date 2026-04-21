@@ -9,12 +9,12 @@ describe('ViewersService', () => {
   const piiKey =
     'fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210';
 
-  const prismaMock = {
+  const prismaMock: any = {
     viewer: {
       create: jest.fn(),
       findMany: jest.fn(),
     },
-  } as unknown as PrismaService;
+  };
 
   beforeEach(() => {
     process.env.VIEWER_ID_CARD_KEY = viewerIdCardKey;

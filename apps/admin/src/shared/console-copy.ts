@@ -46,7 +46,7 @@ const runStatusLabels: Record<RunStatus, string> = {
 
 const validationModeLabels: Record<ValidationMode, string> = {
   GRAY_VALIDATION: '灰度校准',
-  OBSERVE_ONLY: '只观测',
+  OBSERVE_ONLY: '仅观测',
   PREPROD: '预发演练',
   WHITELIST_FULL_PATH: '白名单全链路',
 };

@@ -4,6 +4,7 @@ import {
   controlRunDraftSchema,
   controlRunRecordSchema,
   calibrationReportSchema,
+  customerIdentitySchema,
   eventCatalogSummarySchema,
   eventDetailSchema,
   eventOperationsUpdateSchema,
@@ -18,10 +19,10 @@ import {
   ticketTierSummarySchema,
   loadTestRunDefinitionSchema,
   networkProfileSchema,
-  miniappSessionSchema,
+  customerSessionSchema,
   runStatusSchema,
   scenarioTemplateSchema,
-  wechatPaymentIntentSchema,
+  paymentIntentSchema,
   viewerSchema,
 } from './index';
 
@@ -339,31 +340,42 @@ describe('shared contracts', () => {
     });
   });
 
-  it('validates a miniapp session payload', () => {
+  it('validates a customer identity payload', () => {
     expect(
-      miniappSessionSchema.parse({
+      customerIdentitySchema.parse({
+        id: 'cust_001',
+        accountKey: 'account_abc123',
+      }),
+    ).toMatchObject({
+      accountKey: 'account_abc123',
+    });
+  });
+
+  it('validates a customer session payload', () => {
+    expect(
+      customerSessionSchema.parse({
         token: 'session-token-123',
         customer: {
+          accountKey: 'account_abc123',
           id: 'cust_001',
-          openId: 'openid_abc123',
         },
         expiresAt: '2026-04-24T09:30:00.000Z',
       }),
     ).toMatchObject({
       customer: {
-        openId: 'openid_abc123',
+        accountKey: 'account_abc123',
       },
       token: 'session-token-123',
     });
   });
 
-  it('rejects a miniapp session payload with extra fields', () => {
+  it('rejects a customer session payload with extra fields', () => {
     expect(() =>
-      miniappSessionSchema.parse({
+      customerSessionSchema.parse({
         token: 'session-token-123',
         customer: {
+          accountKey: 'account_abc123',
           id: 'cust_001',
-          openId: 'openid_abc123',
           sessionKey: 'should-not-be-exposed',
         },
         expiresAt: '2026-04-24T09:30:00.000Z',
@@ -371,19 +383,19 @@ describe('shared contracts', () => {
     ).toThrow();
   });
 
-  it('validates the wechat payment intent contract', () => {
+  it('validates the generic payment intent contract', () => {
     expect(
-      wechatPaymentIntentSchema.parse({
-        appId: 'wx-app-id',
-        nonceStr: 'nonce',
-        packageValue: 'prepay_id=wx123',
-        paySign: 'signature',
-        signType: 'RSA',
-        timeStamp: '1713355200',
+      paymentIntentSchema.parse({
+        expiresAt: '2026-04-24T09:30:00.000Z',
+        intentToken: 'intent_123',
+        method: 'EXTERNAL_PROVIDER',
+        orderId: 'ord_123',
+        paymentId: 'pay_123',
+        status: 'PENDING',
       }),
     ).toMatchObject({
-      packageValue: 'prepay_id=wx123',
-      signType: 'RSA',
+      method: 'EXTERNAL_PROVIDER',
+      status: 'PENDING',
     });
   });
 

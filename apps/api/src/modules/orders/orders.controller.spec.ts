@@ -42,7 +42,7 @@ describe('OrdersController', () => {
         quantity: 2,
         ticketType: 'E_TICKET',
       },
-      { id: 'cust_123', openId: 'openid_abc' },
+      { id: 'cust_123', accountKey: 'account_abc' },
     );
 
     expect(checkoutServiceMock.createDraftOrder).toHaveBeenCalledWith({
@@ -79,7 +79,7 @@ describe('OrdersController', () => {
           quantity: 1,
           ticketType: 'BAD_TICKET_TYPE',
         } as never,
-        { id: 'cust_123', openId: 'openid_abc' },
+        { id: 'cust_123', accountKey: 'account_abc' },
       ),
     ).rejects.toThrow(BadRequestException);
     expect(checkoutServiceMock.createDraftOrder).not.toHaveBeenCalled();
@@ -95,7 +95,7 @@ describe('OrdersController', () => {
       ordersServiceMock,
     );
 
-    await expect(controller.listMyOrders({ id: 'cust_123', openId: 'openid_abc' })).resolves.toEqual({
+    await expect(controller.listMyOrders({ id: 'cust_123', accountKey: 'account_abc' })).resolves.toEqual({
       items: [{ id: 'ord_1' }],
     });
     expect(ordersServiceMock.listCustomerOrders).toHaveBeenCalledWith('cust_123');
@@ -112,7 +112,7 @@ describe('OrdersController', () => {
     );
 
     await expect(
-      controller.getMyOrder({ id: 'cust_123', openId: 'openid_abc' }, 'ord_1'),
+      controller.getMyOrder({ id: 'cust_123', accountKey: 'account_abc' }, 'ord_1'),
     ).resolves.toEqual({ id: 'ord_1' });
     expect(ordersServiceMock.getCustomerOrderDetail).toHaveBeenCalledWith(
       'cust_123',

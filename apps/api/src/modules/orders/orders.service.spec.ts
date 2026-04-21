@@ -4,16 +4,16 @@ import { OrderTimelineService } from './order-timeline.service';
 import { OrdersService } from './orders.service';
 
 describe('OrdersService', () => {
-  const prismaMock = {
+  const prismaMock: any = {
     order: {
       findFirst: jest.fn(),
       findMany: jest.fn(),
     },
-  } as never;
+  };
 
-  const orderTimelineServiceMock = {
+  const orderTimelineServiceMock: any = {
     toTimelineItem: jest.fn(),
-  } as never;
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();

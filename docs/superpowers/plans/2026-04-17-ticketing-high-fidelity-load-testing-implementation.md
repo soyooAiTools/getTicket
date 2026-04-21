@@ -858,7 +858,6 @@ Update the root `package.json` scripts:
   "scripts": {
     "dev:api": "corepack pnpm --filter api dev",
     "dev:admin": "corepack pnpm --filter admin dev",
-    "dev:miniapp": "corepack pnpm --filter miniapp dev:weapp",
     "dev:load-control": "corepack pnpm --filter load-control dev",
     "test": "corepack pnpm --filter api test && corepack pnpm --filter load-control test && corepack pnpm --filter load-control test:e2e && corepack pnpm --filter @ticketing/contracts test && corepack pnpm exec vitest run tests/workspace/repo-layout.spec.ts tests/perf/load-testing-fixtures.spec.ts",
     "lint": "corepack pnpm -r --if-present lint && corepack pnpm exec eslint tests --ext .ts"

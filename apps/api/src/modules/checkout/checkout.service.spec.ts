@@ -353,7 +353,7 @@ describe('CheckoutService', () => {
         viewerIds: ['viewer_1'],
         quantity: 2,
         ticketType: 'BAD_TICKET_TYPE',
-      } as never, { id: 'user_123', openId: 'openid_abc123' }),
+      } as never, { id: 'user_123', accountKey: 'account_abc123' }),
     ).rejects.toThrow(BadRequestException);
   });
 });

@@ -1,9 +1,11 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 
+import { Prisma } from '@prisma/client';
+
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { UpstreamTicketingGateway } from '../../common/vendors/upstream-ticketing.gateway';
-import { ORDER_STATUS } from '../orders/order-status';
+import { ORDER_STATUS, type OrderStatus } from '../orders/order-status';
 
 export type RefundReasonCode = 'USER_IDENTITY_ERROR' | 'OTHER';
 
@@ -93,7 +95,7 @@ export type AdminRefundRequestItem = {
   userId: string;
 };
 
-const REFUNDABLE_ORDER_STATUSES = new Set([
+const REFUNDABLE_ORDER_STATUSES: ReadonlySet<OrderStatus> = new Set([
   ORDER_STATUS.PAID_PENDING_FULFILLMENT,
   ORDER_STATUS.SUBMITTED_TO_VENDOR,
   ORDER_STATUS.TICKET_ISSUED,
@@ -514,7 +516,10 @@ export class RefundsService {
     );
   }
 
-  private findOrderForRefundRequest(tx: PrismaService, orderId: string) {
+  private findOrderForRefundRequest(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+  ) {
     return tx.order.findUnique({
       select: {
         id: true,

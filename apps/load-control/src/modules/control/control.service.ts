@@ -185,6 +185,7 @@ export class ControlService {
     run.status = 'PLANNED';
 
     if (this.controlRepository) {
+      await this.persistAssignedNodes(runId, assignments);
       await this.controlRepository.saveAssignments(runId, assignments);
     }
 
@@ -289,6 +290,45 @@ export class ControlService {
     }
 
     await this.controlRepository.createRunDraft(draft);
+  }
+
+  private async persistAssignedNodes(
+    runId: string,
+    assignments: PlannedNodeAssignment[],
+  ): Promise<void> {
+    if (!this.controlRepository || assignments.length === 0) {
+      return;
+    }
+
+    const runRecord = this.runRecords.get(runId);
+
+    if (!runRecord) {
+      return;
+    }
+
+    const nodesById = new Map(
+      this.listNodes().map((node) => [node.id, node] as const),
+    );
+
+    for (const assignment of assignments) {
+      const registeredNode = nodesById.get(assignment.nodeId);
+
+      if (!registeredNode) {
+        continue;
+      }
+
+      await this.controlRepository.upsertNode({
+        id: registeredNode.id,
+        poolId: runRecord.nodePoolId,
+        region: registeredNode.region,
+        role: registeredNode.role,
+        healthStatus: 'ONLINE',
+        maxConcurrency: registeredNode.maxConcurrency,
+        networkProfile: registeredNode.networkProfile,
+        labels: {},
+        lastSeenAt: new Date(),
+      });
+    }
   }
 
   private toStoredRun(run: PersistedStoredRun): StoredRun {

@@ -1,21 +1,48 @@
-import { BadRequestException, Body, Controller, Post } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Headers,
+  Post,
+  UnauthorizedException,
+} from '@nestjs/common';
 
-import { WechatAuthService } from './wechat-auth.service';
+import { SessionBootstrapService } from './session-bootstrap.service';
 
-type ExchangeCodeBody = {
-  code: string;
+type SessionBootstrapBody = {
+  accountKey?: string;
+  displayName?: string;
 };
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly wechatAuthService: WechatAuthService) {}
+  constructor(
+    private readonly sessionBootstrapService: SessionBootstrapService,
+  ) {}
 
-  @Post('wechat/login')
-  login(@Body() body: ExchangeCodeBody) {
-    if (!body || typeof body.code !== 'string' || body.code.trim().length === 0) {
-      throw new BadRequestException('code is required.');
+  @Post('session/bootstrap')
+  bootstrapSession(
+    @Headers('x-load-test-secret') providedSecret: string | undefined,
+    @Body() body: SessionBootstrapBody,
+  ) {
+    if (
+      typeof process.env.LOAD_TEST_INTERNAL_SECRET !== 'string' ||
+      process.env.LOAD_TEST_INTERNAL_SECRET.length === 0 ||
+      providedSecret !== process.env.LOAD_TEST_INTERNAL_SECRET
+    ) {
+      throw new UnauthorizedException(
+        'Load-test bootstrap secret is required.',
+      );
     }
 
-    return this.wechatAuthService.loginWithCode(body.code.trim());
+    if (
+      !body ||
+      typeof body.accountKey !== 'string' ||
+      body.accountKey.trim().length === 0
+    ) {
+      throw new BadRequestException('accountKey is required.');
+    }
+
+    return this.sessionBootstrapService.bootstrapSession(body.accountKey.trim());
   }
 }

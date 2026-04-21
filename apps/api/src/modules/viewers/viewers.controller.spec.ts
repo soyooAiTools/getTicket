@@ -19,7 +19,7 @@ describe('ViewersController', () => {
     ]);
 
     const controller = new ViewersController(viewersServiceMock);
-    const result = await controller.list({ id: 'cust_123', openId: 'openid_abc' });
+    const result = await controller.list({ id: 'cust_123', accountKey: 'account_abc' });
 
     expect(viewersServiceMock.listViewersByUserId).toHaveBeenCalledWith(
       'cust_123',
@@ -43,7 +43,7 @@ describe('ViewersController', () => {
         mobile: '13800138001',
         name: '鏉庡洓',
       },
-      { id: 'cust_123', openId: 'openid_abc' },
+      { id: 'cust_123', accountKey: 'account_abc' },
     );
 
     expect(viewersServiceMock.createViewer).toHaveBeenCalledWith({
@@ -69,7 +69,7 @@ describe('ViewersController', () => {
           mobile: 'not-a-phone',
           name: '',
         },
-        { id: 'cust_123', openId: 'openid_abc' },
+        { id: 'cust_123', accountKey: 'account_abc' },
       ),
     ).rejects.toThrow(BadRequestException);
   });

@@ -31,8 +31,8 @@ export class CustomerSessionGuard implements CanActivate {
       include: {
         customer: {
           select: {
+            accountKey: true,
             id: true,
-            wechatOpenId: true,
           },
         },
       },
@@ -49,8 +49,8 @@ export class CustomerSessionGuard implements CanActivate {
     }
 
     request.customer = {
+      accountKey: session.customer.accountKey,
       id: session.customer.id,
-      openId: session.customer.wechatOpenId,
     };
 
     return true;

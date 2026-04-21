@@ -6,13 +6,13 @@ import { AdminApiSecretGuard } from '../../common/auth/admin-api-secret.guard';
 import { CatalogController } from './catalog.controller';
 import { CatalogService } from './catalog.service';
 
-const prismaMock = {
+const prismaMock: any = {
   event: {
     findMany: jest.fn(),
     findFirst: jest.fn(),
     update: jest.fn(),
   },
-} as never;
+};
 
 describe('CatalogService', () => {
   beforeEach(() => {

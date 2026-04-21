@@ -7,7 +7,7 @@ export type OrderStatusChangedNotificationInput = {
 };
 
 export type NotificationDelivery = {
-  channel: 'WECHAT_SUBSCRIBE_MESSAGE';
+  channel: 'EXTERNAL_NOTIFICATION';
   recipientUserId: string;
   templateKey: 'ORDER_STATUS_CHANGED';
   messagePreview: string;
@@ -24,7 +24,7 @@ export class NotificationsService {
     input: OrderStatusChangedNotificationInput,
   ): NotificationDelivery {
     return {
-      channel: 'WECHAT_SUBSCRIBE_MESSAGE',
+      channel: 'EXTERNAL_NOTIFICATION',
       recipientUserId: input.userId,
       templateKey: 'ORDER_STATUS_CHANGED',
       messagePreview: `订单 ${input.orderId} 状态更新：${input.statusText}`,

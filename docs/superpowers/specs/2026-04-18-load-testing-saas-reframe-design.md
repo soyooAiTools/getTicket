@@ -8,12 +8,11 @@ This document reframes the current repository around the product the team actual
 2. a cloud-node execution platform for coordinated multi-region protocol-level testing
 3. a sample system-under-test already present in the repository for integration and rehearsal
 
-The repository currently contains four top-level applications:
+The repository currently contains three top-level applications:
 
 - [apps/load-control](D:\CodexFolder\apps\load-control)
 - [apps/admin](D:\CodexFolder\apps\admin)
 - [apps/api](D:\CodexFolder\apps\api)
-- [apps/miniapp](D:\CodexFolder\apps\miniapp)
 
 The approved product framing is no longer "ticketing platform with a side testing tool." The approved framing is:
 
@@ -22,7 +21,7 @@ The approved product framing is no longer "ticketing platform with a side testin
 - `primary operator experience`: task orchestration plus real-time observability
 - `embedded sample target`: the ticketing backend in [apps/api](D:\CodexFolder\apps\api)
 
-The miniapp is no longer part of the product center for this design.
+The repository no longer carries the historical end-user frontend.
 
 ## Approved Decisions
 
@@ -72,7 +71,7 @@ This design does not include the following in version 1:
 2. browser-driven agent execution at scale
 3. billing, quotas, or multi-tenant commercial controls
 4. a full security approval workflow platform
-5. a requirement that the miniapp remain a first-class deployment target for the testing product
+5. a requirement to keep any end-user purchase frontend in the testing product boundary
 
 ## Product Reframe
 
@@ -84,8 +83,6 @@ The repository should be understood with these new roles:
    Promoted from a technical helper service into the main control-plane backend for the product.
 3. [apps/api](D:\CodexFolder\apps\api)
    Treated as the embedded sample ticketing backend and default system-under-test.
-4. [apps/miniapp](D:\CodexFolder\apps\miniapp)
-   Downgraded to a non-core module for this product line. It may remain in the repo, but it is not part of the core control, execution, or operator loop.
 
 ## Architecture Overview
 
@@ -306,11 +303,6 @@ The product should not treat orchestration as a hidden backend-only workflow.
 1. [apps/admin](D:\CodexFolder\apps\admin)
    Replace current ticket-operations pages with load-testing control-console pages.
 
-### Deprioritize
-
-1. [apps/miniapp](D:\CodexFolder\apps\miniapp)
-   Keep in the repo if useful, but remove it from the primary product narrative and deployment story.
-
 ## Deployment Model
 
 The deployment shape for this reframed product should be:
@@ -326,7 +318,7 @@ The deployment shape for this reframed product should be:
 5. `Postgres and Redis`
    Shared supporting infrastructure.
 
-This means the correct product deployment story is not "deploy the system as a miniapp." The correct story is "deploy a web control surface, a control backend, cloud agents, and a sample target backend."
+This means the correct product deployment story is "deploy a web control surface, a control backend, cloud agents, and a sample target backend."
 
 ## Version 1 Success Criteria
 
@@ -339,6 +331,23 @@ Version 1 is successful when all of the following are true:
 5. Reports can be generated from completed runs.
 6. The product narrative, navigation, and deployment model clearly describe a load-testing SaaS rather than a customer ticketing product.
 
+## 2026-04-21 Acceptance Baseline
+
+The current branch acceptance baseline for engineering handoff is:
+
+1. `local bootstrap`
+   `.\start-local-stack.cmd --no-browser` can start `api`, `load-control`, and `admin` from empty Docker volumes after dependency install, migrations, and seeds.
+2. `durable planning`
+   Fresh run planning persists nodes before assignment writes, so clean local runs no longer fail on `LoadControlAssignment.nodeId` foreign-key checks.
+3. `provider-neutral sample target`
+   `apps/api` no longer depends on WeChat-specific auth or payment flows for the load-testing path. The sample target now uses generic customer-session bootstrap and generic payment-intent semantics.
+4. `real http probe`
+   The default agent probe executes a real HTTP workflow against `apps/api` using `session bootstrap -> viewers -> catalog -> draft order`, and surfaces unauthorized responses instead of fabricating a retry path.
+5. `fresh smoke`
+   A fresh smoke run can complete end-to-end after stack bootstrap. Latest recorded acceptance run on `2026-04-21` is `run-handoff-smoke-20260421184833`, which completed with `18/18` successful requests, `1` assignment, `1` summary, and `6` resulting orders.
+6. `handoff boundary`
+   The engineering handoff boundary is the load-testing SaaS surface only: `apps/admin`, `apps/load-control`, `apps/api`, and `packages/contracts`. The historical miniapp is intentionally removed.
+
 ## Risks
 
 The main version 1 risks are:
@@ -346,7 +355,7 @@ The main version 1 risks are:
 1. retaining too much ticketing-admin UX in the console, which would blur the product identity
 2. treating telemetry as an afterthought, which would weaken the real-time operating surface
 3. keeping control-plane state in memory, which would make runs and reports unreliable
-4. letting the miniapp remain in the product center, which would confuse deployment and ownership
+4. letting old customer-facing assumptions leak back into the product center, which would confuse deployment and ownership
 
 ## Recommended Next Step
 

@@ -10,6 +10,7 @@ import {
   HttpControlClient,
   type ControlRunSnapshot,
 } from './http-control.client';
+import { HttpWorkflowProbe } from './http-workflow.probe';
 
 type EnvSource = Record<string, string | undefined>;
 
@@ -141,12 +142,22 @@ export async function waitForRunningRun(
   }
 }
 
-function createDefaultProbe(node: NodeRegistration): TargetProbe {
-  return {
-    async execute() {
-      return { success: true, latencyMs: node.networkProfile.baseLatencyMs };
-    },
-  };
+function createDefaultProbe(
+  _node: NodeRegistration,
+  env: EnvSource = process.env,
+): TargetProbe {
+  return new HttpWorkflowProbe({
+    accountPrefix: readEnv(
+      env,
+      ['LOAD_TEST_AGENT_ACCOUNT_PREFIX'],
+      'node-local-user',
+    ),
+    loadTestSecret: readEnv(
+      env,
+      ['LOAD_TEST_INTERNAL_SECRET'],
+      'change-me-load-test-secret',
+    ),
+  });
 }
 
 function findAssignment(
@@ -198,7 +209,7 @@ export async function bootstrap(
     options.statusPollIntervalMs,
   );
   const assignment = findAssignment(runningRun, node.id);
-  const probe = options.probe ?? createDefaultProbe(node);
+  const probe = options.probe ?? createDefaultProbe(node, env);
   const runner =
     options.runner ??
     new AgentRunner(probe, undefined, {

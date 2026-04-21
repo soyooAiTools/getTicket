@@ -256,7 +256,9 @@ export function RunsPage() {
           nextTemplates.find((template) => template.id === current.templateId) ??
           nextTemplates[0];
         const defaultNodePoolId =
-          current.nodePoolId ?? nextNodePools[0]?.id ?? defaultTemplate?.definition.ticketTask?.nodeStrategy.poolId;
+          current.nodePoolId ??
+          nextNodePools[0]?.id ??
+          defaultTemplate?.definition.ticketTask?.nodeStrategy.poolId;
 
         if (!defaultTemplate) {
           return current;
@@ -274,9 +276,7 @@ export function RunsPage() {
       });
     } catch (loadError) {
       setError(
-        loadError instanceof Error
-          ? loadError.message
-          : '无法加载抢票任务页面。',
+        loadError instanceof Error ? loadError.message : '无法加载抢票任务页面。',
       );
     } finally {
       setLoading(false);
@@ -363,9 +363,7 @@ export function RunsPage() {
       await navigate(`/runs/${draft.id}`);
     } catch (createError) {
       setError(
-        createError instanceof Error
-          ? createError.message
-          : '无法创建抢票任务。',
+        createError instanceof Error ? createError.message : '无法创建抢票任务。',
       );
     } finally {
       setSubmittingAction(undefined);

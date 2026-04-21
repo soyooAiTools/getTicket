@@ -2,7 +2,7 @@ import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 
 export type CurrentCustomerPrincipal = {
   id: string;
-  openId: string;
+  accountKey: string;
 };
 
 export const CurrentCustomer = createParamDecorator(

@@ -886,17 +886,17 @@ describe('RefundsService', () => {
           reasonCode: 'USER_IDENTITY_ERROR',
           daysBeforeStart: 2,
         },
-        { id: 'cust_123', openId: 'openid_abc' },
+        { id: 'cust_123', accountKey: 'account_abc' },
       ),
     ).rejects.toThrow(BadRequestException);
   });
 
   it('passes the authenticated customer id into refund requests', async () => {
-    const serviceMock = {
+    const serviceMock: any = {
       requestRefund: jest.fn().mockResolvedValue({
         refundNo: 'RFD-001',
       }),
-    } as never;
+    };
     const controller = new RefundsController(serviceMock);
 
     const result = await controller.requestRefund(
@@ -905,7 +905,7 @@ describe('RefundsService', () => {
         reasonCode: 'OTHER',
         daysBeforeStart: 5,
       },
-      { id: 'cust_123', openId: 'openid_abc' },
+      { id: 'cust_123', accountKey: 'account_abc' },
     );
 
     expect(serviceMock.requestRefund).toHaveBeenCalledWith({
@@ -920,7 +920,7 @@ describe('RefundsService', () => {
   });
 
   it('routes a vendor refund callback through the refunds controller', async () => {
-    const serviceMock = {
+    const serviceMock: any = {
       recordVendorRefund: jest.fn().mockResolvedValue({
         amount: 78000,
         nextStatus: ORDER_STATUS.REFUNDED,
@@ -928,7 +928,7 @@ describe('RefundsService', () => {
         refundNo: 'RFD-1713340800000-ab12cd34',
         source: 'VENDOR_CALLBACK',
       }),
-    } as never;
+    };
     const controller = new RefundsController(serviceMock);
 
     const result = await controller.handleVendorCallback({

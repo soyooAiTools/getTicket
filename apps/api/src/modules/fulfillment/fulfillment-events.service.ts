@@ -327,7 +327,7 @@ export class FulfillmentEventsService {
   }
 
   private async createVendorFulfillmentEvent(
-    tx: PrismaService,
+    tx: Prisma.TransactionClient,
     input: RecordVendorCallbackIssuedInput,
   ): Promise<void> {
     try {
@@ -371,7 +371,7 @@ export class FulfillmentEventsService {
   }
 
   private async advanceOrderToTicketIssued(
-    tx: PrismaService,
+    tx: Prisma.TransactionClient,
     orderId: string,
   ): Promise<OrderStatus> {
     const order = await tx.order.findUnique({
@@ -418,7 +418,7 @@ export class FulfillmentEventsService {
   }
 
   private async resolveIssuanceOutcome(
-    tx: PrismaService,
+    tx: Prisma.TransactionClient,
     orderId: string,
   ): Promise<{ status: OrderStatus; transitioned: boolean }> {
     const order = await tx.order.findUnique({

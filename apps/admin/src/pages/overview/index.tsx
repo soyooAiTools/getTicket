@@ -254,9 +254,7 @@ export function OverviewPage() {
       setTemplates(nextTemplates);
     } catch (loadError) {
       setError(
-        loadError instanceof Error
-          ? loadError.message
-          : '无法加载作战总览。',
+        loadError instanceof Error ? loadError.message : '无法加载作战总览。',
       );
     } finally {
       setLoading(false);

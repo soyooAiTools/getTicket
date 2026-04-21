@@ -763,7 +763,7 @@ describe('FulfillmentEventsService', () => {
   });
 
   it('routes a vendor issued callback through the fulfillment controller', async () => {
-    const serviceMock = {
+    const serviceMock: any = {
       recordVendorCallbackIssued: jest.fn().mockResolvedValue({
         orderId: 'order_1006',
         ticketCode: 'TK-1006',
@@ -771,7 +771,7 @@ describe('FulfillmentEventsService', () => {
         nextStatus: 'TICKET_ISSUED',
         source: 'VENDOR_CALLBACK',
       }),
-    } as never;
+    };
     const controller = new FulfillmentController(serviceMock);
 
     const result = await controller.recordVendorCallbackIssued({

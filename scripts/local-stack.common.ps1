@@ -21,6 +21,10 @@ function Get-LocalStackSeedFile {
   return (Join-Path (Get-LocalStackRepoRoot) 'scripts\sql\seed-load-control-local.sql')
 }
 
+function Get-LocalStackApiSeedFile {
+  return (Join-Path (Get-LocalStackRepoRoot) 'scripts\sql\seed-api-local.sql')
+}
+
 function Get-LocalStackComposeFile {
   return (Join-Path (Get-LocalStackRepoRoot) 'docker-compose.yml')
 }
@@ -40,18 +44,41 @@ function Ensure-LocalStackDirectories {
 
 function Ensure-LocalStackEnvFile {
   $envFile = Get-LocalStackEnvFile
-
-  if (Test-Path $envFile) {
-    return $envFile
-  }
-
   $exampleFile = Get-LocalStackEnvExampleFile
 
   if (-not (Test-Path $exampleFile)) {
     throw "Missing .env.example at $exampleFile"
   }
 
-  Copy-Item $exampleFile $envFile -Force
+  if (-not (Test-Path $envFile)) {
+    Copy-Item $exampleFile $envFile -Force
+    return $envFile
+  }
+
+  $existingKeys = @{}
+
+  Get-Content $envFile | ForEach-Object {
+    if ($_ -match '^\s*([^#=]+)=(.*)$') {
+      $existingKeys[$matches[1].Trim()] = $true
+    }
+  }
+
+  $missingLines = @()
+
+  Get-Content $exampleFile | ForEach-Object {
+    if ($_ -match '^\s*([^#=]+)=(.*)$') {
+      $key = $matches[1].Trim()
+
+      if (-not $existingKeys.ContainsKey($key)) {
+        $missingLines += $_
+      }
+    }
+  }
+
+  if ($missingLines.Count -gt 0) {
+    Add-Content -Path $envFile -Value @('', $missingLines)
+  }
+
   return $envFile
 }
 
@@ -108,7 +135,12 @@ function Invoke-LocalStackCommand {
   Push-Location $WorkingDirectory
 
   try {
+    $global:LASTEXITCODE = 0
     Invoke-Expression $Command
+
+    if ($LASTEXITCODE -ne 0) {
+      throw "Command failed with exit code ${LASTEXITCODE}: $Command"
+    }
   }
   finally {
     Pop-Location
@@ -343,6 +375,64 @@ function Test-LocalStackHttpReady {
   }
 }
 
+function Wait-LocalStackPostgresReady {
+  param(
+    [int]$TimeoutSeconds = 60
+  )
+
+  Ensure-DockerPath
+  $composeFile = Get-LocalStackComposeFile
+  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+
+  while ((Get-Date) -lt $deadline) {
+    & docker compose -f $composeFile exec -T postgres pg_isready -U postgres -d ticketing *> $null
+
+    if ($LASTEXITCODE -eq 0) {
+      return $true
+    }
+
+    Start-Sleep -Milliseconds 750
+  }
+
+  return $false
+}
+
+function Wait-LocalStackRedisReady {
+  param(
+    [int]$TimeoutSeconds = 60
+  )
+
+  Ensure-DockerPath
+  $composeFile = Get-LocalStackComposeFile
+  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+
+  while ((Get-Date) -lt $deadline) {
+    $response = & docker compose -f $composeFile exec -T redis redis-cli PING 2>$null
+
+    if ($LASTEXITCODE -eq 0 -and ($response | Select-Object -Last 1) -eq 'PONG') {
+      return $true
+    }
+
+    Start-Sleep -Milliseconds 750
+  }
+
+  return $false
+}
+
+function Wait-LocalStackInfrastructureReady {
+  param(
+    [int]$TimeoutSeconds = 60
+  )
+
+  if (-not (Wait-LocalStackPostgresReady -TimeoutSeconds $TimeoutSeconds)) {
+    throw 'Postgres failed to become ready.'
+  }
+
+  if (-not (Wait-LocalStackRedisReady -TimeoutSeconds $TimeoutSeconds)) {
+    throw 'Redis failed to become ready.'
+  }
+}
+
 function Ensure-LocalStackDependencies {
   $repoRoot = Get-LocalStackRepoRoot
 
@@ -351,14 +441,36 @@ function Ensure-LocalStackDependencies {
   }
 }
 
+function Clear-LocalStackRedisCache {
+  Ensure-DockerPath
+  $composeFile = Get-LocalStackComposeFile
+  $keys = & docker compose -f $composeFile exec -T redis redis-cli --raw --scan --pattern 'load-control:*'
+
+  if ($LASTEXITCODE -ne 0) {
+    throw 'Failed to enumerate load-control Redis keys.'
+  }
+
+  foreach ($key in @($keys | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })) {
+    & docker compose -f $composeFile exec -T redis redis-cli DEL $key | Out-Null
+
+    if ($LASTEXITCODE -ne 0) {
+      throw "Failed to delete Redis key $key."
+    }
+  }
+}
+
 function Ensure-LocalStackDatabase {
   $repoRoot = Get-LocalStackRepoRoot
+  $apiRoot = Join-Path $repoRoot 'apps\api'
+  $loadControlRoot = Join-Path $repoRoot 'apps\load-control'
 
-  Invoke-LocalStackCommand -WorkingDirectory $repoRoot -Command 'corepack pnpm --filter api prisma:generate'
-  Invoke-LocalStackCommand -WorkingDirectory $repoRoot -Command 'corepack pnpm --filter load-control prisma:generate'
-  Invoke-LocalStackCommand -WorkingDirectory $repoRoot -Command 'corepack pnpm --filter api prisma:migrate'
-  Invoke-LocalStackCommand -WorkingDirectory $repoRoot -Command 'corepack pnpm --filter load-control prisma:migrate'
-  Invoke-LocalStackCommand -WorkingDirectory (Join-Path $repoRoot 'apps\load-control') -Command ('corepack pnpm exec prisma db execute --schema prisma/schema.prisma --file "' + (Get-LocalStackSeedFile) + '"')
+  Invoke-LocalStackCommand -WorkingDirectory $apiRoot -Command 'corepack pnpm exec prisma generate --schema prisma/schema.prisma'
+  Invoke-LocalStackCommand -WorkingDirectory $loadControlRoot -Command 'corepack pnpm exec prisma generate --schema prisma/schema.prisma'
+  Invoke-LocalStackCommand -WorkingDirectory $apiRoot -Command 'corepack pnpm exec prisma migrate deploy --schema prisma/schema.prisma'
+  Invoke-LocalStackCommand -WorkingDirectory $loadControlRoot -Command 'corepack pnpm exec prisma migrate deploy --schema prisma/schema.prisma'
+  Invoke-LocalStackCommand -WorkingDirectory $apiRoot -Command ('corepack pnpm exec prisma db execute --schema prisma/schema.prisma --file "' + (Get-LocalStackApiSeedFile) + '"')
+  Invoke-LocalStackCommand -WorkingDirectory $loadControlRoot -Command ('corepack pnpm exec prisma db execute --schema prisma/schema.prisma --file "' + (Get-LocalStackSeedFile) + '"')
+  Clear-LocalStackRedisCache
 }
 
 function Start-LocalStackManagedService {
