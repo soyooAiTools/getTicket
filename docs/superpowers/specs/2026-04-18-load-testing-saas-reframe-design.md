@@ -1,133 +1,133 @@
-# Load Testing SaaS Reframe Design
+# Load-Testing SaaS 重构设计说明
 
-## Context
+## 背景
 
-This document reframes the current repository around the product the team actually wants to build:
+这份文档用于把当前仓库重新定义为团队真正要交付的产品：
 
-1. an internal load-testing SaaS for authorized ticketing-system validation
-2. a cloud-node execution platform for coordinated multi-region protocol-level testing
-3. a sample system-under-test already present in the repository for integration and rehearsal
+1. 一套面向内部的抢票系统压测 SaaS
+2. 一套以云节点为核心的多区域协议级执行平台
+3. 一套已经存在于仓库中的样例被测系统，用于联调、演练与产品演示
 
-The repository currently contains three top-level applications:
+当前仓库中保留的三大顶层应用为：
 
-- [apps/load-control](D:\CodexFolder\apps\load-control)
-- [apps/admin](D:\CodexFolder\apps\admin)
-- [apps/api](D:\CodexFolder\apps\api)
+- `apps/load-control`
+- `apps/admin`
+- `apps/api`
 
-The approved product framing is no longer "ticketing platform with a side testing tool." The approved framing is:
+本次确认后的产品定义已经不再是“票务平台附带一个测试工具”，而是：
 
-- `primary product`: internal load-testing SaaS
-- `primary execution path`: cloud protocol agents
-- `primary operator experience`: task orchestration plus real-time observability
-- `embedded sample target`: the ticketing backend in [apps/api](D:\CodexFolder\apps\api)
+- `主产品`：内部 Load-Testing SaaS
+- `主执行路径`：云端协议级 Agent
+- `主操作体验`：任务编排 + 实时观测
+- `内置样例目标`：`apps/api` 中的票务后端
 
-The repository no longer carries the historical end-user frontend.
+仓库中也不再保留历史终端用户前台。
 
-## Approved Decisions
+## 已确认决策
 
-The following decisions are already approved and should be treated as fixed input for this spec:
+以下决策已经视为固定输入，不再在本规格内反复讨论：
 
-1. `product boundary`
-   The platform is an internal load-testing SaaS, not an end-user ticket-buying product.
-2. `target scope`
-   The first target is the existing internal ticketing backend sample in [apps/api](D:\CodexFolder\apps\api).
-3. `organizational scope`
-   Version 1 serves a single internal team, not multiple business lines or external customers.
-4. `node strategy`
-   Execution is cloud-node-first, not desktop-first.
-5. `agent strategy`
-   Version 1 uses protocol-level agents, not browser automation agents.
-6. `console priority`
-   The console must support both orchestration and real-time observation, with real-time observation visible on the main operating surface.
+1. `产品边界`
+   平台是内部压测 SaaS，不是面向最终购票用户的产品。
+2. `目标范围`
+   第一阶段的目标系统就是仓库中的现有票务后端样例 `apps/api`。
+3. `组织范围`
+   版本 1 服务单一内部团队，不面向多业务线或外部客户。
+4. `节点策略`
+   执行模式以云节点优先，而不是桌面端优先。
+5. `Agent 策略`
+   版本 1 使用协议级 Agent，而不是浏览器自动化 Agent。
+6. `控制台优先级`
+   控制台必须同时承担编排和实时观测两类职责，而且实时观测必须进入主操作面。
 
-## Product Definition
+## 产品定义
 
-The approved product is a three-part internal platform:
+最终确认后的产品是一个三段式内部平台：
 
-1. `Control Console`
-   A web console for operators to define runs, start and stop tests, observe node health, inspect active phases, and review results.
-2. `Control Plane`
-   A backend service that stores run definitions, validates policy gates, plans phase budgets, assigns work to nodes, aggregates telemetry, and generates reports.
-3. `Agent Fleet`
-   A set of cloud protocol agents that execute assigned traffic patterns and continuously report telemetry and final summaries.
+1. `控制台`
+   给操作人员定义任务、启动和停止测试、观察节点健康、查看当前 phase、复盘结果。
+2. `控制面`
+   存储任务定义、校验策略门禁、规划 phase budget、分配节点、聚合遥测、生成报告。
+3. `Agent 集群`
+   由多区域云节点组成，执行分配到的流量模式，并持续回传遥测与最终汇总。
 
-The ticketing backend in [apps/api](D:\CodexFolder\apps\api) is treated as an embedded system-under-test, not as the primary product itself.
+仓库中的 `apps/api` 被视为内置样例被测系统，而不是产品主体本身。
 
-## Goals
+## 目标
 
-This design must achieve the following outcomes:
+本设计必须达成以下结果：
 
-1. Give internal testers a single system to create, run, observe, and evaluate high-fidelity load tests.
-2. Make live run visibility first-class, so operators can see current phase, node health, pressure level, and failure behavior while a run is active.
-3. Preserve structured task orchestration, so operators can consistently create runs, choose node pools, apply scenarios, and control execution.
-4. Reuse the existing ticketing backend as a sample target for rehearsals, validation, and product demos.
-5. Keep the first version simple enough for a single internal team while leaving clean boundaries for later growth.
+1. 给内部测试与研发团队提供一套统一系统，用于创建、运行、观察和评估高保真压测任务
+2. 把实时运行态观测提升为一等能力，让操作人员在任务执行中能直接看到 phase、节点健康、压力水平与异常行为
+3. 保留结构化任务编排能力，让操作人员可以稳定地创建任务、选择节点池、套用模板、控制执行
+4. 复用现有票务后端作为演练目标、联调目标和产品 demo 目标
+5. 在版本 1 内保持范围足够克制，便于单一内部团队快速接手与迭代
 
-## Non-Goals
+## 非目标
 
-This design does not include the following in version 1:
+版本 1 不包括以下内容：
 
-1. a public or customer-facing load-testing product
-2. browser-driven agent execution at scale
-3. billing, quotas, or multi-tenant commercial controls
-4. a full security approval workflow platform
-5. a requirement to keep any end-user purchase frontend in the testing product boundary
+1. 公有化或面向客户出售的压测产品
+2. 大规模浏览器自动化 Agent
+3. 计费、配额或多租户商业化控制
+4. 完整的安全审批或发布流转平台
+5. 保留任何终端购票前台作为本产品边界的一部分
 
-## Product Reframe
+## 产品重构后的仓库角色
 
-The repository should be understood with these new roles:
+本仓库在产品语义上应这样理解：
 
-1. [apps/admin](D:\CodexFolder\apps\admin)
-   Reframed from "ticketing admin console" into the load-testing SaaS control console.
-2. [apps/load-control](D:\CodexFolder\apps\load-control)
-   Promoted from a technical helper service into the main control-plane backend for the product.
-3. [apps/api](D:\CodexFolder\apps\api)
-   Treated as the embedded sample ticketing backend and default system-under-test.
+1. `apps/admin`
+   从原来的“票务后台”重构为压测 SaaS 的控制台。
+2. `apps/load-control`
+   从技术辅助服务提升为产品级控制面。
+3. `apps/api`
+   作为内置样例票务后端与默认被测系统继续保留。
 
-## Architecture Overview
+## 架构总览
 
-The approved version 1 architecture contains five logical areas:
+版本 1 的目标架构包含五个逻辑区域：
 
-1. `Control Console`
-   The operator-facing SaaS web application.
-2. `Control Plane`
-   The orchestration, validation, telemetry, and reporting backend.
-3. `Agent Fleet`
-   Cloud protocol agents grouped into node pools by region and role.
-4. `System Under Test`
-   The ticketing backend sample in [apps/api](D:\CodexFolder\apps\api).
-5. `Runtime Infrastructure`
-   Data stores and streaming infrastructure for state, telemetry, and coordination.
+1. `控制台`
+   面向操作人员的 SaaS Web 应用。
+2. `控制面`
+   负责任务编排、策略校验、遥测聚合与报告产出。
+3. `Agent 集群`
+   按区域与角色分组的云端协议级执行节点。
+4. `被测系统`
+   仓库中的样例票务后端 `apps/api`。
+5. `运行时基础设施`
+   承担状态存储、实时广播与协同控制的底层依赖。
 
-## Control Console
+## 控制台设计
 
-The control console should become the main product entry point.
+控制台应成为这套产品的主入口。
 
-### Core Principles
+### 核心原则
 
-1. The home page is not a static reporting page.
-2. The home page is a live operations surface for active runs.
-3. Run orchestration remains a core product feature, not a hidden sub-flow.
-4. The console should feel like a "test operations room" rather than a CRUD-heavy admin dashboard.
+1. 首页不是静态报表页
+2. 首页必须是面向运行中的实时作战面
+3. 任务编排不是次级功能，而是主产品能力
+4. 整体体验应该更像“测试作战室”，而不是“CRUD 导向后台”
 
-### Approved Top-Level Areas
+### 顶层区域
 
-The console should expose these version 1 areas:
+版本 1 的控制台应包含以下区域：
 
-1. `Overview`
-   Live view of currently active runs, node health, current phase, aggregate QPS, error rate, major alerts, and quick actions.
-2. `Runs`
-   Run creation, run listing, templates, phase editing, node-pool selection, and start/stop actions.
-3. `Run Detail`
-   A single run's live execution surface, including phase timeline, node states, telemetry charts, event stream, and completion progress.
-4. `Node Pools`
-   Cloud node inventory by region, role, network profile, capacity, and current allocation.
-5. `Reports`
-   Baseline versus production comparisons, calibration outcomes, score breakdowns, and exportable summaries.
+1. `作战总览`
+   展示当前运行任务、节点健康、当前 phase、聚合 QPS、错误率、关键告警与快捷动作。
+2. `抢票任务`
+   用于创建任务、查看任务列表、使用模板、调整 phase、选择节点池、启动或停止任务。
+3. `任务作战台`
+   面向单个任务的实时运行视图，包括 phase 时间线、节点状态、遥测图表、事件流与完成进度。
+4. `节点池`
+   管理云节点资源，展示区域、角色、网络画像、容量与当前分配情况。
+5. `校准复盘`
+   用于比较基线任务与生产近似任务，给出真实性、容量、公平性、可控性等维度的评分与建议。
 
-### Recommended Routes
+### 建议路由
 
-The version 1 route model should become:
+版本 1 的路由模型应固定为：
 
 - `/overview`
 - `/runs`
@@ -135,236 +135,233 @@ The version 1 route model should become:
 - `/nodes`
 - `/reports/:baselineRunId/:productionRunId`
 
-This route set should replace the current ticket-operations navigation in [apps/admin/src/router.tsx](D:\CodexFolder\apps\admin\src\router.tsx).
+这套路由应取代 `apps/admin/src/router.tsx` 中历史票务后台导航。
 
-## Control Plane
+## 控制面设计
 
-The control plane remains centered in [apps/load-control](D:\CodexFolder\apps\load-control), but its product role changes from "support service" to "platform core."
+控制面继续以 `apps/load-control` 为核心，但产品角色已经从“辅助服务”提升为“平台主内核”。
 
-### Required Responsibilities
+### 必须承担的职责
 
-1. register and track node availability
-2. create and persist runs
-3. validate policy gates before planning and before execution
-4. transform run definitions into phase assignments
-5. coordinate run start and stop actions
-6. ingest real-time telemetry
-7. ingest final node summaries
-8. aggregate live status for the console
-9. generate post-run reports and calibration output
+1. 注册并跟踪节点可用性
+2. 创建并持久化任务
+3. 在规划前与启动前校验策略门禁
+4. 将任务定义转换为按节点分发的 phase assignment
+5. 协调 start / stop 生命周期
+6. 接收实时遥测
+7. 接收最终 summary
+8. 为控制台聚合 live run 状态
+9. 生成运行后报告与校准结果
 
-### Required Internal Domains
+### 主要内部域
 
-The version 1 control plane should contain the following functional domains:
+版本 1 的控制面应至少包含以下功能域：
 
 1. `Run Control`
-   Run lifecycle, node registration, assignment ownership, start and stop coordination.
+   负责任务生命周期、节点注册、assignment 所有权、启动与停止协调。
 2. `Scenario Planning`
-   Phase budget calculation, pool allocation, node-level assignment generation.
+   负责 phase budget 计算、池级资源分配、节点级 assignment 生成。
 3. `Policy Guard`
-   Validation for production-like modes, whitelist constraints, and write-path controls.
+   负责生产近似模式校验、白名单限制与写路径控制。
 4. `Realtime Telemetry`
-   Live node metrics ingestion, aggregation, stream fan-out, and active run status updates.
+   负责 live node 指标写入、聚合、广播与运行态快照生成。
 5. `Reporting`
-   Summary validation, score generation, calibration comparison, and operator-facing results.
+   负责 summary 校验、评分生成、校准比较与最终复盘输出。
 
-The existing modules in [apps/load-control/src/modules](D:\CodexFolder\apps\load-control\src\modules) already cover part of this structure, but `Realtime Telemetry` must become a first-class addition rather than an implicit side effect of summary upload.
+当前 `apps/load-control/src/modules` 已经覆盖了其中一部分结构，但 `Realtime Telemetry` 必须作为一等能力明确存在，而不是仅靠 summary 上传“顺带完成”。
 
-## Agent Fleet
+## Agent 集群
 
-Version 1 agents are cloud protocol agents.
+版本 1 的 Agent 形态是云端协议级 Agent。
 
-### Responsibilities
+### Agent 职责
 
-Each agent must:
+每个 Agent 必须：
 
-1. register itself with the control plane
-2. publish region, role, and capacity metadata
-3. fetch its assigned run work
-4. execute protocol-level traffic within phase windows
-5. continuously emit live telemetry during execution
-6. emit a final validated summary at run completion
+1. 向控制面注册自身
+2. 发布区域、角色与容量元数据
+3. 拉取自身分配到的任务
+4. 在 phase 时间窗中执行协议级请求
+5. 在执行过程中持续回传 live telemetry
+6. 在任务结束后回传最终 summary
 
-### Explicit Non-Responsibilities
+### 明确不承担的职责
 
-Version 1 agents do not need to:
+版本 1 的 Agent 不需要：
 
-1. emulate complete browser flows
-2. own complex local UI
-3. store long-lived state between runs
-4. become a general-purpose remote execution framework
+1. 模拟完整浏览器行为
+2. 拥有复杂本地 UI
+3. 维护跨任务的长生命周期状态
+4. 演化为通用远程执行平台
 
-## System Under Test
+## 被测系统
 
-The default system-under-test is [apps/api](D:\CodexFolder\apps\api).
+默认被测系统是 `apps/api`。
 
-In this design it plays three roles:
+在这套设计中，它承担三类角色：
 
-1. a demo target for the internal load-testing product
-2. a rehearsal environment for end-to-end system wiring
-3. a validation sample for queueing, inventory, checkout, refund, and fulfillment behavior
+1. 内部压测产品的演示目标
+2. 端到端联调与演练目标
+3. 对排队、库存、草稿单、支付、退款、履约等行为进行校验的样例系统
 
-The system-under-test is not part of the load-testing control surface, but it is a first-class integration target.
+被测系统不是控制台的一部分，但它是这套产品的一等集成目标。
 
-## Runtime Infrastructure
+## 运行时基础设施
 
-Version 1 should use:
+版本 1 应固定使用：
 
 1. `Postgres`
-   Persistent state for runs, node pools, templates, summaries, reports, and auditable operator actions.
+   用于持久化任务、节点池、模板、summary、报告以及可审计的操作行为。
 2. `Redis`
-   Short-lived live state, telemetry fan-out, active-run snapshots, and coordination support for real-time updates.
+   用于保存短生命周期实时状态、遥测聚合结果、active run snapshot 与运行协调数据。
 
-The current repository already provides Postgres and Redis in [docker-compose.yml](D:\CodexFolder\docker-compose.yml), but persistence must move beyond the current in-memory-only control-plane storage model for this product framing to be durable.
+仓库已经在 `docker-compose.yml` 中提供了 Postgres 与 Redis，但当前产品语义要求控制面必须摆脱纯内存态模型，才能真正具备可交付的持久性。
 
-## Primary User Flow
+## 主要用户流程
 
-A complete version 1 run should follow this lifecycle:
+版本 1 中一条完整任务的理想生命周期应为：
 
-1. An operator creates a run from the console.
-2. The control plane validates the run and stores it.
-3. The scenario planner generates per-node assignments.
-4. Node agents retrieve assignments and prepare for execution.
-5. The operator starts the run.
-6. Agents execute phase windows and emit live telemetry.
-7. The control plane aggregates telemetry and streams live state to the console.
-8. Agents upload final summaries.
-9. The run transitions to completed state only after summary validation passes.
-10. The operator reviews results and calibration output in the reports surface.
+1. 操作人员在控制台创建任务
+2. 控制面校验并持久化任务
+3. 规划器生成按节点分配的 assignment
+4. 节点 Agent 拉取 assignment 并准备执行
+5. 操作人员启动任务
+6. Agent 在 phase 时间窗内执行流量并持续回传 telemetry
+7. 控制面聚合 live 状态并推送给控制台
+8. Agent 上传最终 summary
+9. 只有在 summary 校验通过后，任务才进入 completed 状态
+10. 操作人员在复盘页查看结果与校准输出
 
-## Data Flow
+## 数据流
 
-The approved data flow is:
+当前批准的数据流模型为：
 
-1. `Console to Control Plane`
-   Run definitions, node-pool selection, start/stop commands, report fetches.
-2. `Control Plane to Agents`
-   Assignment payloads, policy constraints, run timing, stop or scale-down signals.
-3. `Agents to System Under Test`
-   Protocol traffic for the approved scenario.
-4. `Agents to Control Plane`
-   Live telemetry and final summary payloads.
-5. `Control Plane to Console`
-   Live aggregate status, alerts, phase progression, node health, and report results.
+1. `控制台 -> 控制面`
+   任务定义、节点池选择、start / stop 命令、报告查询。
+2. `控制面 -> Agent`
+   assignment、策略限制、运行时间窗、停止信号。
+3. `Agent -> 被测系统`
+   按场景定义发起协议级请求流量。
+4. `Agent -> 控制面`
+   持续上报 live telemetry 与最终 summary。
+5. `控制面 -> 控制台`
+   返回聚合状态、告警、phase 进度、节点健康与报告结果。
 
-## Realtime Observation Model
+## 实时观测模型
 
-Real-time observation is a top-priority capability and must shape the product surface.
+实时观测是产品优先级最高的能力之一，必须反过来塑造控制台主界面。
 
-### Minimum Live Run Signals
+### 最低可视信号
 
-The console must be able to show these live signals for an active run:
+控制台必须能展示以下 live 信号：
 
-1. current run state
-2. current phase
-3. number of active versus unhealthy nodes
-4. aggregate QPS
-5. aggregate error rate
-6. key latency views
-7. node-level drift or degradation
-8. recent operator-visible alerts or guardrail actions
+1. 当前任务状态
+2. 当前 phase
+3. 活跃节点数与异常节点数
+4. 聚合 QPS
+5. 聚合错误率
+6. 关键延迟指标
+7. 节点退化或漂移情况
+8. 最近的操作层面告警或 guardrail 动作
 
-### Product Consequence
+### 产品含义
 
-The console homepage should prioritize active-run awareness over static administration. Operators should not need to open multiple pages just to know whether a run is healthy.
+控制台首页必须优先让操作者知道“现在任务是否健康”，而不是让他们跳多个页面后再拼出运行态。
 
-## Orchestration Model
+## 编排模型
 
-Task orchestration remains equally important and should be treated as a peer to observability.
+任务编排与实时观测同等重要，必须被视为对等的一组能力。
 
-### Minimum Version 1 Orchestration Actions
+### 版本 1 最低编排动作
 
-Operators must be able to:
+操作人员至少需要能够：
 
-1. create a run
-2. choose a scenario template
-3. choose a node pool
-4. review the planned phase structure
-5. start a run
-6. stop a run
-7. inspect run history
-8. duplicate a previous run as a new draft
+1. 创建任务
+2. 选择模板
+3. 选择节点池
+4. 预览 phase 结构
+5. 启动任务
+6. 停止任务
+7. 查看历史任务
+8. 基于历史任务复制出新草稿
 
-The product should not treat orchestration as a hidden backend-only workflow.
+这套产品不能把编排能力藏成控制面的后台流程。
 
-## Current Repository Mapping
+## 当前仓库映射
 
-### Reuse Directly
+### 直接复用
 
-1. [apps/load-control](D:\CodexFolder\apps\load-control)
-   Keep as the control-plane backend and extend it with persistent state and real-time telemetry.
-2. [apps/api](D:\CodexFolder\apps\api)
-   Keep as the embedded sample target.
-3. [packages/contracts](D:\CodexFolder\packages\contracts)
-   Continue using shared schemas for run definitions, summaries, and report payloads.
+1. `apps/load-control`
+   继续作为控制面后端，并补齐持久化与实时遥测能力。
+2. `apps/api`
+   继续作为内置样例被测系统。
+3. `packages/contracts`
+   继续承担 run definition、summary、report payload 的共享合约职责。
 
-### Repurpose
+### 重构复用
 
-1. [apps/admin](D:\CodexFolder\apps\admin)
-   Replace current ticket-operations pages with load-testing control-console pages.
+1. `apps/admin`
+   把历史票务运营页面替换为压测控制台页面。
 
-## Deployment Model
+## 部署模型
 
-The deployment shape for this reframed product should be:
+重构后的产品部署形态应理解为：
 
-1. `Control Console`
-   A web frontend deployed as the operator-facing SaaS UI.
-2. `Control Plane`
-   A dedicated backend service, separate from the system-under-test.
-3. `Agent Pool`
-   One or more cloud node groups deployed by region.
-4. `System Under Test`
-   The sample ticketing backend deployed as a separate service.
-5. `Postgres and Redis`
-   Shared supporting infrastructure.
+1. `控制台`
+   独立部署的 Web 操作界面。
+2. `控制面`
+   与被测系统分离部署的后端服务。
+3. `Agent 池`
+   分区域部署的云节点执行集群。
+4. `被测系统`
+   独立部署的样例票务后端。
+5. `Postgres + Redis`
+   作为支持状态与实时能力的底层设施。
 
-This means the correct product deployment story is "deploy a web control surface, a control backend, cloud agents, and a sample target backend."
+也就是说，正确的产品部署叙事应是“一个控制台、一个控制面、一组云节点 Agent、一个样例目标系统”。
 
-## Version 1 Success Criteria
+## 版本 1 成功标准
 
-Version 1 is successful when all of the following are true:
+当以下条件全部满足时，版本 1 可以视为成功：
 
-1. Operators can create and start a run from the console.
-2. Operators can observe active run health and phase progress without waiting for post-run summaries.
-3. Cloud agents can execute planned protocol scenarios and stream telemetry.
-4. The control plane can validate and store final summaries.
-5. Reports can be generated from completed runs.
-6. The product narrative, navigation, and deployment model clearly describe a load-testing SaaS rather than a customer ticketing product.
+1. 操作人员能在控制台创建并启动任务
+2. 操作人员在任务执行中即可观测健康状态与 phase 进度，而不是只能看事后 summary
+3. 云节点 Agent 能执行规划后的协议级场景，并持续回传 telemetry
+4. 控制面能校验并持久化最终 summary
+5. 已完成任务可以生成报告与校准结果
+6. 产品叙事、路由结构与部署模型都清晰指向“压测 SaaS”，而不是客户侧票务产品
 
-## 2026-04-21 Acceptance Baseline
+## 2026-04-21 验收基线
 
-The current branch acceptance baseline for engineering handoff is:
+当前分支在研发交接层面的验收基线为：
 
-1. `local bootstrap`
-   `.\start-local-stack.cmd --no-browser` can start `api`, `load-control`, and `admin` from empty Docker volumes after dependency install, migrations, and seeds.
-2. `durable planning`
-   Fresh run planning persists nodes before assignment writes, so clean local runs no longer fail on `LoadControlAssignment.nodeId` foreign-key checks.
-3. `provider-neutral sample target`
-   `apps/api` no longer depends on WeChat-specific auth or payment flows for the load-testing path. The sample target now uses generic customer-session bootstrap and generic payment-intent semantics.
-4. `real http probe`
-   The default agent probe executes a real HTTP workflow against `apps/api` using `session bootstrap -> viewers -> catalog -> draft order`, and surfaces unauthorized responses instead of fabricating a retry path.
+1. `本地启动`
+   `.\start-local-stack.cmd --no-browser` 可以在空 Docker volume 条件下启动 `api`、`load-control` 与 `admin`，并自动完成依赖、迁移与 seed。
+2. `持久化规划`
+   fresh run 在规划阶段会先持久化节点，再写入 assignment，因此 clean stack 不再触发 `LoadControlAssignment.nodeId` 外键失败。
+3. `通用样例目标`
+   `apps/api` 在压测链路上已经不再依赖微信语义，而是使用通用 session bootstrap 与通用 payment intent 样例。
+4. `真实 HTTP Probe`
+   默认 Agent 探针已经改为对 `apps/api` 执行 `session bootstrap -> viewers -> catalog -> draft order` 的真实 HTTP workflow，并在收到未授权响应时明确失败，而不是伪造重试成功。
 5. `fresh smoke`
-   A fresh smoke run can complete end-to-end after stack bootstrap. Latest recorded acceptance run on `2026-04-21` is `run-handoff-smoke-20260421234408`, which completed with `18/18` successful requests, `1` assignment, `1` summary, and `6` resulting orders.
-6. `handoff boundary`
-   The engineering handoff boundary is the load-testing SaaS surface only: `apps/admin`, `apps/load-control`, `apps/api`, and `packages/contracts`.
+   本地栈启动后可以完成一条 fresh smoke run。最新记录为 `run-handoff-smoke-20260421234408`，结果为 `18/18` 成功请求、`1` 个 assignment、`1` 个 summary、`6` 个生成订单。
+6. `交付边界`
+   当前研发交接边界仅包含 SaaS 主面：`apps/admin`、`apps/load-control`、`apps/api` 与 `packages/contracts`。
 
-## Risks
+## 风险
 
-The main version 1 risks are:
+版本 1 的主要风险包括：
 
-1. retaining too much ticketing-admin UX in the console, which would blur the product identity
-2. treating telemetry as an afterthought, which would weaken the real-time operating surface
-3. keeping control-plane state in memory, which would make runs and reports unreliable
-4. letting old customer-facing assumptions leak back into the product center, which would confuse deployment and ownership
+1. 控制台保留过多旧票务后台语义，导致产品身份模糊
+2. 把 telemetry 当成附属能力，削弱实时作战面的价值
+3. 控制面仍残留过多内存态，导致运行与报告不可靠
+4. 历史客户侧产品假设重新渗入当前边界，干扰部署与职责划分
 
-## Recommended Next Step
+## 下一步建议
 
-The next approved step after this design is to write an implementation plan that:
+在这份设计之后，后续实现或扩展应继续遵循以下方向：
 
-1. repurposes the admin frontend into the control console
-2. adds persistent run and node state to the control plane
-3. adds a real-time telemetry path
-4. formalizes node-pool and run orchestration APIs
-5. preserves the sample target backend in [apps/api](D:\CodexFolder\apps\api)
-
-That plan should treat the console and telemetry path as version 1 product-critical work, not as polish items.
+1. 持续将 `admin` 打磨成面向压测任务的控制台，而不是回退成票务后台
+2. 保持控制面中的 run、node、telemetry、report 四条主线职责清晰
+3. 继续优先保障实时观测链路，而不是把它作为“后续优化项”
+4. 在扩展被测系统或 Agent 形态时，依旧保持 `apps/api` 为样例目标、`apps/load-control` 为控制中枢的产品结构

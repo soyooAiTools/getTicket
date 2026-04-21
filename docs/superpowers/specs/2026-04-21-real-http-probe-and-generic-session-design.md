@@ -1,435 +1,118 @@
-# Real HTTP Probe And Generic Session Design
-
-## Context
+# Real HTTP Probe 与通用会话链路设计说明
 
-The current load-testing stack can boot, plan a run, execute an agent, stream
-telemetry, and complete a run, but the agent still uses a stub probe that
-returns synthetic success. The result is a control-plane smoke test rather than
-a real end-to-end pressure path against the sample ticketing backend.
+## 背景
 
-At the same time, the sample backend still carries legacy WeChat-specific
-authentication and payment flows:
+在这轮设计开始前，load-testing 栈已经能够完成以下流程：
 
-1. customer login is exposed as `POST /api/auth/wechat/login`
-2. payment intent and callback flows are modeled as WeChat JSAPI endpoints
-3. environment configuration and contracts still expose `WECHAT_*` and
-   `WechatPaymentIntent`
+1. 启动控制面
+2. 创建 run
+3. 规划 run
+4. 执行 Agent
+5. 推送实时遥测
+6. 完成 run 并持久化 summary
 
-The approved direction is to solve both problems together:
+但当时 Agent 仍然依赖 stub probe，只会返回 synthetic success，因此整套系统本质上还是“控制面烟雾测试”，而不是针对样例票务后端的真实端到端压测路径。
 
-1. replace the agent stub probe with a real HTTP workflow probe that executes
-   against `apps/api`
-2. remove WeChat-specific login and payment assumptions from the sample backend
-   so the pressure-testing platform and sample API are both provider-agnostic
+与此同时，`apps/api` 里还保留着较重的特定平台登录 / 支付语义，例如：
 
-## Goals
+1. 登录链路依赖 WeChat 风格接口
+2. 支付 intent 与回调仍然是 WeChat JSAPI 语义
+3. 环境变量、合约与命名里还残留 `WECHAT_*`
 
-1. Make the agent execute real HTTP requests against `apps/api`.
-2. Support a stable V1 workflow of:
-   `session bootstrap -> viewers -> catalog events -> event detail/tier -> draft order`.
-3. Replace WeChat-specific customer login with a generic internal session
-   bootstrap flow that works for local, preprod, and controlled load testing.
-4. Reframe the sample payments module into a generic payment-intent sandbox so
-   the sample backend no longer depends on WeChat-specific routes, contracts, or
-   environment variables.
-5. Preserve the existing control-plane lifecycle, run model, and phase planner
-   so current planning, telemetry, reporting, and battle-station flows continue
-   to work.
+这会同时带来两个问题：
 
-## Non-Goals
+1. Agent 无法通过真实业务 HTTP 路径施压
+2. 样例后端对特定平台强绑定，不利于本地、预发与受控演练场景复用
 
-1. Driving real browser automation.
-2. Integrating live third-party authentication providers.
-3. Introducing a full customer registration product flow.
-4. Redesigning the load-control phase model into a step graph in this round.
-5. Adding account-pool management UI in this round.
-6. Making payment-pressure testing part of the first HTTP probe rollout.
+## 目标
 
-## Approved Approach
+本轮设计要达成：
 
-### Recommended Approach
+1. 让 Agent 对 `apps/api` 发起真实 HTTP 请求
+2. 支持稳定的一期 workflow：
+   `session bootstrap -> viewers -> catalog events -> event detail -> draft order`
+3. 用通用内部会话 bootstrap 替代 WeChat 专属登录
+4. 把样例支付模块改成 provider-neutral 的 payment intent sandbox
+5. 保持现有 control-plane 生命周期、phase planner、telemetry 与报告模型不变
 
-Use a dedicated internal session bootstrap endpoint together with a stateful
-HTTP workflow probe.
+## 非目标
 
-This approach keeps the existing load-control run model intact while upgrading
-the execution path from synthetic success to real backend traffic. It also
-separates controlled load-testing authentication from external providers, which
-keeps local and preprod runs deterministic.
+本轮不做：
 
-### Rejected Alternatives
+1. 浏览器自动化 Agent
+2. 真实第三方认证接入
+3. 完整客户注册产品流程
+4. 将 load-control phase 模型重构成 step graph
+5. 账号池管理 UI
+6. 在第一版真实 HTTP probe 中引入支付压测
 
-1. Reuse `/api/auth/wechat/login` for load testing.
-   This would keep the agent coupled to external code exchange, AppId/Secret
-   configuration, and unstable provider behavior.
-2. Pre-seed tokens in the database and skip login at runtime.
-   This would be quick but would hide the login step from the workflow and make
-   future multi-account scaling awkward.
-3. Only rename WeChat symbols without changing behavior.
-   This would leave the backend functionally provider-specific while merely
-   hiding the coupling.
+## 已批准方案
 
-## Architecture
+### 推荐方案
 
-The final V1 path has four major pieces:
+采用“内部 session bootstrap + 有状态 HTTP workflow probe”的组合。
 
-1. a generic session bootstrap flow in `apps/api`
-2. a generic sample payment module in `apps/api`
-3. a stateful HTTP workflow probe in `apps/load-control`
-4. updated contracts and seeds that no longer encode WeChat-specific semantics
+这样做的好处是：
 
-### Runtime Flow
+1. 不需要推翻现有 run lifecycle
+2. 能把 synthetic success 升级为真实后端流量
+3. 能让本地与预发压测保持稳定、可控、可复现
+4. 能让认证路径脱离外部平台依赖
 
-```text
-agent assignment
-  -> bootstrap customer session
-  -> fetch viewers
-  -> create viewer if needed
-  -> list published events
-  -> fetch event detail
-  -> choose session/tier
-  -> create draft order
-  -> report real telemetry and summary
-```
+### 放弃的替代方案
 
-## Generic Session Design
+以下路径在本轮被明确放弃：
 
-### Data Model
+1. 继续保留 stub probe，只在 summary 里伪造业务结果
+2. 直接引入浏览器自动化，把真实 UI 作为第一阶段执行器
+3. 继续沿用 WeChat 风格登录与支付语义，仅在命名层面“弱化品牌感”
 
-`CustomerAccount` becomes provider-neutral.
+## 目标工作流
 
-Current:
+一期真实 workflow 为：
 
-```text
-CustomerAccount.wechatOpenId
-CustomerIdentity.openId
-```
+1. `POST /api/auth/session/bootstrap`
+2. `GET /api/viewers`
+3. 如果缺少目标 viewer，则 `POST /api/viewers`
+4. `GET /api/catalog/events`
+5. `GET /api/catalog/events/:eventId`
+6. `POST /api/orders/draft`
 
-New:
+Agent 在 phase 周期内重复执行该链路，并上报 telemetry 与最终 summary。
 
-```text
-CustomerAccount.accountKey
-CustomerIdentity.accountKey
-```
+## API 侧设计
 
-The `CustomerSession` model remains in place. The token, token hash, expiry, and
-customer ownership semantics do not change.
+### 通用会话 bootstrap
 
-### API
+新增专门面向内部压测和本地联调的 session bootstrap 接口，用来：
 
-Delete:
+1. 按 `accountKey` 获取或创建样例 customer
+2. 下发可复用的 bearer token
+3. 让 Agent 在没有外部平台前置动作的情况下稳定进入业务链路
 
-```text
-POST /api/auth/wechat/login
-```
+### 通用支付样例流程
 
-Add:
+支付模块保留为“样例可运行”状态，但从命名和合约上转为 provider-neutral 的 payment intent sandbox。这样既能保留演示和联调价值，也不会把真实第三方平台接入强行耦合到压测主路径中。
 
-```text
-POST /api/auth/session/bootstrap
-```
+## Agent 侧设计
 
-The endpoint is an internal bootstrap route for the sample backend and
-controlled load-testing flows.
+`HttpWorkflowProbe` 负责维护会话状态，并执行上述真实 HTTP workflow。它需要处理：
 
-Request headers:
+1. token 缓存与复用
+2. `401 Unauthorized` 后清理 token 并在下一次重新 bootstrap
+3. viewer 不存在时的创建逻辑
+4. catalog 或 draft order 失败时的错误上报
 
-```text
-x-load-test-secret: <LOAD_TEST_INTERNAL_SECRET>
-```
+## 验收标准
 
-Request body:
+本轮设计的验收标准包括：
 
-```ts
-{
-  accountKey: string
-  displayName?: string
-}
-```
+1. fresh local stack 下可以成功创建、规划并启动真实 HTTP run
+2. Agent summary 能落库
+3. `api` 与 `load-control` 错误日志保持干净
+4. 现有控制台、作战台与复盘视图无需因 probe 切换而重写
 
-Response:
+## 相关文档
 
-```ts
-{
-  token: string
-  customer: {
-    id: string
-    accountKey: string
-  }
-  expiresAt: string
-}
-```
-
-### Behavior
-
-1. If `LOAD_TEST_INTERNAL_SECRET` is missing, the route rejects all requests.
-2. `accountKey` is treated as the stable synthetic customer identity.
-3. The service upserts `CustomerAccount` by `accountKey`.
-4. The service creates a fresh `CustomerSession` token and returns the same
-   bearer-token semantics used by the existing `CustomerSessionGuard`.
-5. The route does not create viewers or orders. Its only responsibility is
-   session bootstrap.
-
-### Security Boundary
-
-This endpoint is intentionally internal-only.
-
-1. It uses a dedicated secret, not `ADMIN_API_SECRET`.
-2. It is intended for local, preprod, and controlled internal runs.
-3. It should never be described as a public customer login flow in docs or UI.
-
-## Generic Payment Sample Design
-
-### Goal
-
-Keep payment and fulfillment progression in the sample backend without binding
-the backend to WeChat JSAPI semantics.
-
-### Contract Change
-
-Replace `WechatPaymentIntent` with a generic `PaymentIntent`.
-
-Current contract shape is SDK-oriented and WeChat-specific. The new contract
-should be sample-backend oriented:
-
-```ts
-{
-  paymentId: string
-  orderId: string
-  method: 'EXTERNAL_PROVIDER'
-  status: 'PENDING'
-  intentToken: string
-  expiresAt: string
-}
-```
-
-The exact field names can vary slightly during implementation, but the intent
-must remain provider-neutral and suitable for backend-driven sandbox flows.
-
-### Payment Routes
-
-Delete:
-
-```text
-POST /api/payments/wechat/intent
-POST /api/payments/wechat/callback
-```
-
-Add:
-
-```text
-POST /api/payments/intents
-POST /api/payments/intents/:paymentId/confirm
-```
-
-### Payment Behavior
-
-`POST /api/payments/intents`
-
-1. validates that the order belongs to the current customer
-2. validates that the order is still pending payment
-3. creates or returns a pending sample payment intent
-4. returns a generic `PaymentIntent`
-
-`POST /api/payments/intents/:paymentId/confirm`
-
-1. marks the sample payment as successful
-2. transitions the order to `PAID_PENDING_FULFILLMENT`
-3. triggers the same downstream fulfillment event submission path already used
-   by the sample backend
-
-### Prisma Changes
-
-The payment model stays because it still has value for order state progression,
-but the provider-specific enum and naming need to be generalized.
-
-Current:
-
-```text
-PaymentMethod.WECHAT_PAY
-Payment.providerTxnId
-```
-
-Recommended V1 target:
-
-```text
-PaymentMethod.EXTERNAL_PROVIDER
-Payment.externalTxnId
-```
-
-If renaming `providerTxnId` turns out to be too invasive for the first pass, the
-database field may stay in place temporarily as an internal storage name, but
-the API, service naming, and contracts must all become provider-neutral.
-
-## HTTP Workflow Probe Design
-
-### Probe Type
-
-Replace the current stub `TargetProbe` default with a stateful
-`HttpWorkflowProbe`.
-
-The probe owns lightweight execution context:
-
-```ts
-{
-  token?: string
-  viewerId?: string
-  eventId?: string
-  tierId?: string
-}
-```
-
-### Workflow Rules
-
-The probe keeps the existing load-control pool model but performs real HTTP work
-inside each probe call.
-
-#### Query Pool
-
-On each query request:
-
-1. ensure a valid session token exists
-2. `GET /api/catalog/events`
-3. choose a published event
-4. `GET /api/catalog/events/:eventId`
-5. choose a session/tier
-6. cache `eventId` and `tierId`
-
-#### Order Submit Pool
-
-On each order-submission request:
-
-1. ensure a valid session token exists
-2. ensure `tierId` exists, refreshing catalog context if necessary
-3. `GET /api/viewers`
-4. if no usable viewer exists, `POST /api/viewers`
-5. `POST /api/orders/draft`
-
-The viewer payload can be deterministic sample data derived from node id and
-worker index so runs are reproducible.
-
-#### Queue And Inventory Pools
-
-The current control-plane model includes queue and inventory pools, but the
-sample backend does not yet expose true queue or inventory lock endpoints.
-
-V1 strategy:
-
-1. keep these pools in the assignment model
-2. allow the probe to no-op them or map them to lightweight catalog refreshes
-3. do not invent fake queue or lock endpoints in this round
-
-## Request Template Alignment
-
-The old request-template defaults point at fictional paths. They need to be
-replaced with paths aligned to the sample API:
-
-1. auth bootstrap
-2. viewers list/create
-3. catalog event list
-4. catalog event detail
-5. draft order creation
-
-The existing request-template structure does not currently model a multi-step
-workflow, so V1 should keep the current outer schema and treat it as a pacing
-and timeout envelope while the probe controls the real internal step sequence.
-
-## Error Handling
-
-### Probe Errors
-
-1. Any non-2xx response marks the current request as failed.
-2. `401` clears the cached token and forces re-bootstrap on the next attempt.
-3. `404`, `400`, and `422` are reported as real failures rather than retried
-   away invisibly.
-4. Missing or stale `eventId`/`tierId` causes the probe to refresh catalog
-   context.
-
-### Bootstrap Errors
-
-If the internal bootstrap secret is missing or invalid, the route fails fast and
-the agent request is recorded as failed. This makes environment errors visible
-through normal run telemetry.
-
-### Payment Errors
-
-Generic payment intent and confirm endpoints should continue using explicit
-validation errors when the order does not belong to the customer, is already
-paid, or is otherwise in the wrong state.
-
-## Configuration
-
-### New Environment Variables
-
-Add:
-
-```text
-LOAD_TEST_INTERNAL_SECRET=
-LOAD_TEST_AGENT_ACCOUNT_PREFIX=node-local-user
-```
-
-Optional implementation-time convenience knobs may be added for deterministic
-viewer generation, but they should stay minimal in V1.
-
-### Removed Environment Variables
-
-Remove all `WECHAT_*` entries from `.env.example` and from sample-backend
-documentation.
-
-## Testing Requirements
-
-### Backend
-
-1. Add auth tests for the new session bootstrap flow.
-2. Replace WeChat auth tests with generic session-bootstrap tests.
-3. Replace WeChat payment tests with generic payment-intent and confirm tests.
-4. Update Prisma-backed tests and fixtures for `accountKey` semantics.
-
-### Contracts
-
-1. Replace the WeChat payment contract test with a generic payment intent test.
-2. Update customer session contract tests to assert `accountKey`.
-
-### Agent
-
-1. Add probe tests for token bootstrap, viewer ensure, catalog selection, and
-   draft-order submission.
-2. Add failure-path coverage for `401`, catalog misses, and order validation
-   errors.
-
-### End-To-End Verification
-
-Successful rollout requires a real local run that proves:
-
-1. the agent acquires a bearer token through the generic bootstrap endpoint
-2. the agent performs real requests to:
-   - `GET /api/viewers`
-   - `POST /api/viewers`
-   - `GET /api/catalog/events`
-   - `GET /api/catalog/events/:eventId`
-   - `POST /api/orders/draft`
-3. the run still transitions to `COMPLETED`
-4. telemetry and summaries reflect real HTTP outcomes rather than stub success
-
-## Migration Strategy
-
-1. Introduce schema and contract changes first.
-2. Replace auth and payment modules with generic variants.
-3. Update environment examples and docs.
-4. Switch the agent default probe from stub to HTTP workflow.
-5. Re-seed or migrate local sample data if necessary.
-
-This order keeps the backend stable before the agent begins depending on the
-new endpoints.
-
-## Success Criteria
-
-This project is successful when:
-
-1. no WeChat-specific auth or payment routes remain in the sample backend
-2. `.env.example` no longer advertises `WECHAT_*` configuration
-3. contracts and service naming are provider-neutral
-4. the default agent executes real HTTP requests against `apps/api`
-5. a local run can complete the approved V1 workflow using real backend traffic
-6. the existing control-plane run lifecycle, telemetry, and reporting continue
-   to function
+- [2026-04-21-real-http-probe-and-generic-session-implementation.md](../plans/2026-04-21-real-http-probe-and-generic-session-implementation.md)
+- [2026-04-21-load-testing-saas-engineering-handoff.md](../guides/2026-04-21-load-testing-saas-engineering-handoff.md)

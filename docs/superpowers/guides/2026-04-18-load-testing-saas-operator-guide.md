@@ -1,13 +1,10 @@
-# Load-Testing SaaS Operator Console Guide
+# Load-Testing SaaS 操作台使用说明
 
-This guide covers the current operator-facing surface for the load-testing
-SaaS reframe. The primary operator workflow now runs through `apps/admin`
-and `apps/load-control`, with `apps/api` serving as the embedded
-system-under-test for local rehearsal and smoke validation.
+这份文档描述当前 Load-Testing SaaS 重构后的操作台与运行面。当前主操作路径已经收敛到 `apps/admin` 与 `apps/load-control`，而 `apps/api` 则作为本地联调与 smoke 的内置样例被测系统。
 
-## Console Routes
+## 控制台路由
 
-The current routed control surface is:
+当前控制台公开的主要路由是：
 
 - `/overview`
 - `/runs`
@@ -15,15 +12,15 @@ The current routed control surface is:
 - `/nodes`
 - `/reports/:baselineRunId/:productionRunId`
 
-The operator-facing Chinese labels shown in the console are:
+控制台内显示的中文路由标题为：
 
-- `/overview`: `作战总览`
-- `/runs`: `抢票任务`
-- `/runs/:runId`: `任务作战台`
-- `/nodes`: `节点池`
-- `/reports/:baselineRunId/:productionRunId`: `校准复盘`
+- `/overview`：`作战总览`
+- `/runs`：`抢票任务`
+- `/runs/:runId`：`任务作战台`
+- `/nodes`：`节点池`
+- `/reports/:baselineRunId/:productionRunId`：`校准复盘`
 
-The task form on `/runs` is organized as:
+`/runs` 页面中的任务表单目前分为以下几个区块：
 
 - `基础参数`
 - `场次信息`
@@ -31,17 +28,17 @@ The task form on `/runs` is organized as:
 - `节点策略`
 - `执行策略`
 
-Primary task actions are:
+任务页上的主要操作按钮为：
 
 - `保存任务草稿`
 - `创建并规划`
 - `创建、规划并启动`
 
-## Runtime APIs
+## 运行时 API
 
-The console talks directly to the `load-control` runtime API.
+控制台直接对接 `load-control` 的运行时接口。
 
-Core control endpoints:
+核心控制接口：
 
 - `GET /control/node-pools`
 - `GET /control/templates`
@@ -54,13 +51,12 @@ Core control endpoints:
 - `POST /control/runs/:runId/stop`
 - `GET /control/reports/calibration/:baselineRunId/:productionRunId`
 
-Live execution endpoints:
+实时运行相关接口：
 
 - `GET /control/runs/:runId/live`
 - `GET /control/runs/:runId/stream`
 
-Agent-to-target execution now uses a real HTTP workflow probe against
-`apps/api`:
+当前 Agent 对目标系统执行的真实 HTTP workflow 为：
 
 - `POST /api/auth/session/bootstrap`
 - `GET /api/viewers`
@@ -69,15 +65,15 @@ Agent-to-target execution now uses a real HTTP workflow probe against
 - `GET /api/catalog/events/:eventId`
 - `POST /api/orders/draft`
 
-## Configuration
+## 配置说明
 
-`apps/admin` resolves the load-control base URL in this order:
+`apps/admin` 会按照以下顺序解析 `load-control` 的基础地址：
 
 1. `window.localStorage['load-testing.operator.base-url']`
 2. `VITE_LOAD_CONTROL_BASE_URL`
-3. default `http://localhost:3001/control`
+3. 默认值 `http://localhost:3001/control`
 
-Key local environment settings for the full stack are:
+本地全栈联调时，最关键的环境变量是：
 
 - `LOAD_CONTROL_BASE_URL`
 - `VITE_LOAD_CONTROL_BASE_URL`
@@ -87,33 +83,32 @@ Key local environment settings for the full stack are:
 - `LOAD_CONTROL_DATABASE_URL`
 - `REDIS_URL`
 
-## Local Stack Launchers
+## 本地栈启动脚本
 
-The fastest local path is:
+本地最快的启动方式是：
 
 ```powershell
 .\start-local-stack.cmd --no-browser
 ```
 
-That launcher delegates into `scripts/start-local-stack.ps1` and
-`scripts/local-stack.common.ps1`. The current startup flow now:
+这个启动器会转入 `scripts/start-local-stack.ps1` 与 `scripts/local-stack.common.ps1`。当前启动流程已经固定为：
 
-1. ensures `.env` exists
-2. backfills missing keys from `.env.example`
-3. starts `Postgres` and `Redis` with `docker compose`
-4. waits until both services are actually reachable
-5. installs dependencies if `node_modules` is missing
-6. runs non-interactive Prisma generate and migrate for `api` and `load-control`
-7. seeds both the API demo catalog and the persisted load-control catalog
-8. clears `load-control:*` Redis keys after reseed
-9. starts `api`, `load-control`, and `admin`
+1. 确保 `.env` 存在
+2. 从 `.env.example` 回填缺失配置项
+3. 通过 `docker compose` 启动 `Postgres` 与 `Redis`
+4. 等待两个基础设施都真正 ready
+5. 如果缺失 `node_modules`，自动补装依赖
+6. 对 `api` 与 `load-control` 执行非交互的 Prisma generate / migrate
+7. 执行 API demo 数据与 load-control 持久化目录的 seed
+8. 在 reseed 后清理 `load-control:*` Redis 键
+9. 启动 `api`、`load-control`、`admin`
 
-Companion launchers:
+配套脚本包括：
 
 - `.\status-local-stack.cmd`
 - `.\stop-local-stack.cmd`
 
-Operational state is written under `.codex-temp/local-stack`, with logs in:
+本地栈运行状态会写入 `.codex-temp/local-stack`，日志位于：
 
 - `.codex-temp/local-stack/logs/api.out.log`
 - `.codex-temp/local-stack/logs/api.err.log`
@@ -122,55 +117,55 @@ Operational state is written under `.codex-temp/local-stack`, with logs in:
 - `.codex-temp/local-stack/logs/admin.out.log`
 - `.codex-temp/local-stack/logs/admin.err.log`
 
-## Seeded Local Data
+## 预置本地数据
 
-The local stack now boots with:
+本地栈启动后会自动得到以下预置数据：
 
-- persisted node pools and scenario templates in `apps/load-control`
-- one published demo event and session in `apps/api`
-- one seeded draft run: `run-local-demo-01`
+- `apps/load-control` 中持久化的节点池与任务模板
+- `apps/api` 中一个已发布的样例演出与场次
+- 一个预置 draft run：`run-local-demo-01`
 
-This means operators can:
+这意味着操作人员可以直接：
 
-1. start the stack
-2. open `/runs`
-3. inspect or clone seeded templates
-4. plan or start a run without first hand-authoring all sample data
+1. 启动本地栈
+2. 打开 `/runs`
+3. 查看或复制预置模板
+4. 无需手工补全大量样例数据就能直接规划或启动任务
 
-## Local End-To-End Smoke
+## 本地端到端 Smoke
 
-The current handoff smoke path is:
+当前 handoff smoke 的标准路径为：
 
-1. start the stack from empty Docker volumes
-2. register a local agent against `load-control`
-3. create a fresh run
-4. plan the run
-5. start the run
-6. let the agent execute the real HTTP workflow against `apps/api`
-7. confirm summaries and live telemetry are persisted
+1. 从空 Docker volume 启动本地栈
+2. 向 `load-control` 注册本地 Agent
+3. 创建一条 fresh run
+4. 规划 run
+5. 启动 run
+6. 让 Agent 对 `apps/api` 执行真实 HTTP workflow
+7. 确认 summary 与 live telemetry 都已持久化
 
-Latest verified fresh smoke baseline on `2026-04-21`:
+最新一次已验证的 fresh smoke 基线记录于 `2026-04-21`：
 
-- run id: `run-handoff-smoke-20260421234408`
-- final status: `COMPLETED`
-- assignment count: `1`
-- summary count: `1`
-- phase result: `18 / 18` successful requests
-- resulting order count: `6`
+- run id：`run-handoff-smoke-20260421234408`
+- 最终状态：`COMPLETED`
+- assignment 数：`1`
+- summary 数：`1`
+- phase 成功结果：`18 / 18`
+- 生成订单数：`6`
 
-## Recommended Operator Flow
+## 推荐操作流程
 
-1. Open `/overview` to confirm the stack is healthy.
-2. Open `/runs` and choose a seeded template.
-3. Fill or adjust `场次信息`, `票档目标`, `节点策略`, and `执行策略`.
-4. Save as draft or plan immediately.
-5. Start the run and switch to `/runs/:runId`.
-6. Watch live node telemetry, current phase, and summary collection.
-7. Use `/reports/...` when comparing completed baseline and production-like runs.
+1. 打开 `/overview` 确认整体栈状态正常
+2. 打开 `/runs`，选择一个预置模板
+3. 补充或调整 `场次信息`、`票档目标`、`节点策略`、`执行策略`
+4. 先保存草稿，或者直接规划
+5. 启动任务后切换到 `/runs/:runId`
+6. 观察节点实时状态、当前 phase、聚合指标与 summary 回传情况
+7. 比较基线与生产近似任务时，进入 `/reports/...` 查看复盘结果
 
-## Verification Commands
+## 验证命令
 
-Use these commands when validating the handoff baseline:
+可用于交接基线确认的命令如下：
 
 ```powershell
 corepack pnpm --filter api exec jest --runInBand
@@ -183,24 +178,17 @@ corepack pnpm exec vitest run tests/workspace/local-stack-launchers.spec.ts --re
 corepack pnpm --filter admin build
 ```
 
-## Troubleshooting
+## 常见排查
 
-- If a fresh run fails during planning with a node foreign-key error, confirm the
-  current `ControlService` change is present. Planned nodes must be persisted
-  before assignments are written.
-- If `POST /control/runs` or telemetry ingestion returns `400`, check the
-  request payload first. Contract validation failures now surface as client
-  errors instead of opaque `500` responses.
-- If seeded runs or templates look stale after a reseed, restart with the local
-  launcher so the post-seed Redis clear runs.
-- If the agent receives `401 Unauthorized` from `apps/api`, confirm
-  `LOAD_TEST_INTERNAL_SECRET` matches across the API and agent process.
-- If the first session bootstrap races under concurrency, confirm the current
-  bootstrap fallback and probe-side bootstrap deduplication are present.
+- 如果 fresh run 在规划阶段报 node foreign-key 错误，优先确认当前 `ControlService` 已包含“先持久化节点再写 assignment”的改动
+- 如果 `POST /control/runs` 或 telemetry 写入返回 `400`，优先检查请求体是否满足合约；当前 Zod 校验失败已经明确以客户端错误返回
+- 如果 reseed 后看到的模板或运行态仍旧像旧数据，优先重新通过本地启动器重启，让 Redis 清理逻辑重新执行
+- 如果 Agent 从 `apps/api` 收到 `401 Unauthorized`，优先确认 API 与 Agent 使用的是同一个 `LOAD_TEST_INTERNAL_SECRET`
+- 如果高并发下第一次 bootstrap 出现抖动，优先确认当前分支已经带上 bootstrap 去重与 fallback 逻辑
 
-## Product Boundary
+## 当前产品边界
 
-For this branch, the active handoff boundary is:
+当前交接边界限定为：
 
 - `apps/admin`
 - `apps/load-control`

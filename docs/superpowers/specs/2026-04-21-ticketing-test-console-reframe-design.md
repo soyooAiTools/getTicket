@@ -1,150 +1,95 @@
-# Ticketing Test Console Reframe Design
+# 抢票测试操作台重构设计说明
 
-## Context
+## 背景
 
-The current admin console is technically functional, but the operator-facing
-language still presents the product as a generic load-testing SaaS. Internal
-testers who open `http://localhost:5173/overview` do not immediately see where
-to create and run ticket-grabbing rehearsal tasks because the UI is framed in
-terms of generic runs, operator summaries, and calibration reports.
+在控制台技术能力已经可用的前提下，旧版操作界面仍然过于通用，内部测试同学打开页面后，无法立刻判断：
 
-The approved direction is to keep the existing backend model and execution
-capabilities, but reframe the console into a ticket-grabbing test operations
-surface. This is a language, information architecture, and workflow change, not
-a ground-up backend redesign.
+1. 去哪里创建抢票任务
+2. 去哪里启动或停止任务
+3. 去哪里看实时作战态势
+4. 去哪里做复盘与校准
 
-## Goals
+因此这轮设计的核心不是重写后端，而是把现有控制面能力重新包装成更贴近抢票演练的中文操作体验。
 
-1. Make the console read like a ticket-grabbing test workstation rather than a
-   generic load-testing dashboard.
-2. Preserve the existing `run`, `node pool`, `telemetry`, and `report`
-   lifecycle so the product remains usable immediately.
-3. Clarify where operators create tasks, start tasks, watch live execution, and
-   review replay or calibration outcomes.
-4. Localize the core control surface into Chinese for the internal team.
+## 目标
 
-## Non-Goals
+1. 让控制台读起来像“抢票测试操作台”，而不是 generic dashboard
+2. 保留现有 `run`、`node pool`、`telemetry` 与 `report` 生命周期
+3. 明确任务创建、任务执行、实时观测与校准复盘的主路径
+4. 将核心操作界面中文化，方便内部团队直接使用
 
-1. Adding a new account-pool system.
-2. Adding vendor-specific ticketing adapters.
-3. Introducing a full i18n framework or bilingual toggle.
-4. Replacing the current control-plane APIs or data contracts.
+## 非目标
 
-## Approved Product Reframe
+1. 新增账号池系统
+2. 新增厂商专属票务适配器
+3. 引入完整 i18n 基础设施或双语切换
+4. 替换当前控制面 API 或数据合约
 
-The console should be presented as a "抢票测试操作台" built on top of the
-existing control-plane primitives.
+## 已批准产品重构方式
 
-Existing backend entities keep their current responsibilities:
+控制台应被呈现为建立在既有控制面之上的“抢票测试操作台”。
+
+原有后端实体仍保持职责不变，只调整前台语义：
 
 1. `run`
-   Remains the persisted execution record, but is presented as a "抢票任务".
+   仍然是持久化执行记录，但前台展示为“抢票任务”
 2. `scenario template`
-   Remains the reusable definition, but is presented as a "任务模板".
+   仍然是可复用定义，但前台展示为“任务模板”
 3. `node pool`
-   Remains the execution resource pool, but is presented as a "节点池".
+   仍然是执行资源池，但前台展示为“节点池”
 4. `live snapshot`
-   Remains the runtime telemetry view, but is presented as live battle-state
-   data in a "任务作战台".
+   仍然是运行时遥测视图，但前台展示为“任务作战台”中的实时态势
 5. `calibration report`
-   Remains the comparative score output, but is presented as "校准复盘".
+   仍然是对比评分结果，但前台展示为“校准复盘”
 
-## Information Architecture
+## 页面级设计方向
 
-The console keeps the current route skeleton but changes the operator-facing
-meaning:
+### 控制台壳层
 
-1. `/overview`
-   Presented as "作战总览". This page answers what is running now, what capacity
-   is available, and what the operator should do next.
-2. `/runs`
-   Presented as "抢票任务". This page becomes the primary entry point for
-   creating and managing task executions.
-3. `/runs/:runId`
-   Presented as "任务作战台". This page becomes the real-time execution surface
-   for one task.
-4. `/nodes`
-   Presented as "节点池". This page shows available regions, resource pools, and
-   registered runtime nodes.
-5. `/reports/:baselineRunId/:productionRunId`
-   Presented as "校准复盘". This page keeps the comparative output but shifts the
-   narrative toward rehearsal review and adjustment.
+壳层需要明确传达：
 
-## Page-Level Requirements
+1. 这是统一操作台
+2. 用户可以从这里完成任务创建、启动、观测与复盘
 
-### 作战总览
+### 总览页
 
-The overview page must:
+总览页要突出：
 
-1. highlight active tasks and recently completed tasks
-2. expose quick navigation into task creation and task drill-down
-3. describe templates and node pools in operational language
-4. avoid generic "operator" wording
+1. 当前任务数量
+2. 当前活跃 run
+3. 节点健康概况
+4. 快速进入任务页、节点页与复盘页的入口
 
-### 抢票任务
+### 任务页
 
-The runs page must:
+任务页是主操作面，需要承担：
 
-1. use task-oriented labels for creation fields and actions
-2. clearly distinguish create, plan, start, stop, and inspect actions
-3. explain run fields in terms internal testers expect, such as target address,
-   batch tag, global concurrency, and per-node concurrency
+1. 新建抢票任务
+2. 查看既有任务列表
+3. 对任务执行规划、启动、停止等动作
 
 ### 任务作战台
 
-The run detail page must:
+运行详情页要以“作战台”叙事呈现：
 
-1. present live execution as a battle station, not a generic record detail
-2. show current status, current phase, live node states, and aggregate metrics
-3. keep phase plans, assignments, summaries, and alerts accessible in one page
-4. translate run status, stream state, mode, and role labels into Chinese
+1. 当前 phase
+2. 节点健康
+3. 实时流量与错误
+4. summary 回传结果
 
-### 节点池
+### 节点页与复盘页
 
-The nodes page must:
+节点页与复盘页继续保留当前能力，但统一为中文业务化语言。
 
-1. present seeded pools and registered nodes in resource language
-2. describe network profiles in a way operators can quickly read
-3. avoid purely technical inventory wording where a more operational term fits
+## 验收标准
 
-### 校准复盘
+通过以下结果说明该设计成立：
 
-The reports page must:
+1. 控制台主要路由均已中文化
+2. 路由、壳层与关键标题均有测试保护
+3. 操作员无需理解底层技术术语，也能找到主操作路径
 
-1. explain that the report compares one rehearsal against another
-2. keep the four scores visible
-3. frame recommendations as adjustments for the next rehearsal
+## 相关文档
 
-## Shared Labeling Layer
-
-The console should introduce a lightweight shared label mapper rather than a
-full i18n stack.
-
-This mapper should cover at least:
-
-1. run status values
-2. validation mode values
-3. node role values
-4. node health status values
-5. stream states
-
-The mapper should live in the admin app and be reusable across overview, runs,
-run detail, nodes, and reports pages.
-
-## Testing Requirements
-
-1. Update existing admin view tests so they assert the new Chinese product
-   language for the overview and run-detail pages.
-2. Update router tests so the control shell reflects the new console identity.
-3. Add or extend tests only where the reframe changes visible behavior.
-
-## Success Criteria
-
-This reframe is successful when:
-
-1. an internal tester can open `/overview` and immediately understand this is a
-   ticket-grabbing test operations console
-2. the route and page labels clearly show where to create and run a task
-3. the live detail page feels like a task battle station instead of a generic
-   backend detail page
-4. the current backend flows still work without API changes
+- [2026-04-21-ticketing-test-console-reframe-implementation.md](../plans/2026-04-21-ticketing-test-console-reframe-implementation.md)
+- [2026-04-18-load-testing-saas-operator-guide.md](../guides/2026-04-18-load-testing-saas-operator-guide.md)

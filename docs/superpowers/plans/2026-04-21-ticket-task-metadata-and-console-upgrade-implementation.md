@@ -1,73 +1,31 @@
-# Ticket Task Metadata And Console Upgrade Implementation Plan
+# 抢票任务元数据与控制台升级实施记录
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+## 目标
 
-**Goal:** Add structured ticket-task metadata and upgrade the console so task creation and viewing feel like real ticket-grabbing rehearsals.
+为 load-testing run 增加结构化 `ticketTask` 元数据，并据此升级控制台，让任务创建、任务列表与任务详情更像真实的抢票演练，而不是通用技术工单。
 
-**Architecture:** Extend the shared load-testing contract with a `ticketTask` object, update seeded templates and node pools in both application defaults and local SQL seed data, and then rework the admin task pages so they create, list, and display the richer task metadata without changing the underlying run lifecycle.
+## 实施结果
 
-**Tech Stack:** TypeScript, Zod, NestJS, React, Ant Design, Prisma, Vitest
+本轮改造已经完成以下内容：
 
----
+1. 在共享合约中引入 `ticketTask` 结构
+2. 更新默认节点池与默认模板，使其名称和默认值更贴近抢票演练场景
+3. 更新本地 SQL seed 数据，让本地联调与截图演示默认呈现中文业务语义
+4. 升级 `apps/admin` 的任务创建页，按 `基础参数`、`场次信息`、`票档目标`、`节点策略`、`执行策略` 分区输入
+5. 在任务列表与任务作战台中展示新的任务摘要信息
 
-## Task 1: Contract And Seed Model Foundations
+## 影响范围
 
-**Files:**
-- Modify: `D:\CodexFolder\.worktrees\load-testing-saas-reframe\packages\contracts\src\load-testing.ts`
-- Modify: `D:\CodexFolder\.worktrees\load-testing-saas-reframe\packages\contracts\src\index.ts`
-- Modify: `D:\CodexFolder\.worktrees\load-testing-saas-reframe\apps\load-control\src\modules\control\default-control-catalog.ts`
-- Modify: `D:\CodexFolder\.worktrees\load-testing-saas-reframe\scripts\sql\seed-load-control-local.sql`
+- `packages/contracts`
+- `apps/load-control`
+- `scripts/sql/seed-load-control-local.sql`
+- `apps/admin`
 
-- [ ] Add a `ticketTask` schema and exported types to the shared contracts.
-- [ ] Update default node pools to Chinese operational names.
-- [ ] Update default templates to Chinese rehearsal names and include realistic `ticketTask` defaults.
-- [ ] Update the local SQL seed to match the new names and `ticketTask` payload shape.
+## 验证方式
 
-## Task 2: Failing Coverage For New Metadata
+本轮主要通过共享合约测试、控制台页面测试与本地 seed 联调验证完成收口。
 
-**Files:**
-- Modify or create targeted tests under `D:\CodexFolder\.worktrees\load-testing-saas-reframe\tests`
-- Modify or create targeted tests under `D:\CodexFolder\.worktrees\load-testing-saas-reframe\apps\admin\src\pages`
+## 相关文档
 
-- [ ] Write a failing test that proves the new `ticketTask` contract is validated.
-- [ ] Write or update admin view tests so the task list or detail page must render the new ticket-task summary information.
-- [ ] Run the targeted tests and confirm they fail for the right reason before implementation.
-
-## Task 3: Console Shared Copy And Mapping Upgrade
-
-**Files:**
-- Modify: `D:\CodexFolder\.worktrees\load-testing-saas-reframe\apps\admin\src\shared\console-copy.ts`
-
-- [ ] Add label helpers for execution objectives and launch modes.
-- [ ] Add shared helper functions for summarizing task event and ticket metadata in the UI.
-
-## Task 4: Task Creation Page Upgrade
-
-**Files:**
-- Modify: `D:\CodexFolder\.worktrees\load-testing-saas-reframe\apps\admin\src\pages\runs\index.tsx`
-
-- [ ] Replace the generic task-creation fields with grouped sections for event, ticket, node strategy, and execution strategy.
-- [ ] Map the new fields into `definition.ticketTask` when building a run draft.
-- [ ] Preserve existing lifecycle actions while adding the three creation actions: save draft, create-and-plan, create-plan-and-start.
-- [ ] Add a live summary strip that reflects the current form selection.
-
-## Task 5: Task List And Battle Station Upgrade
-
-**Files:**
-- Modify: `D:\CodexFolder\.worktrees\load-testing-saas-reframe\apps\admin\src\pages\runs\index.tsx`
-- Modify: `D:\CodexFolder\.worktrees\load-testing-saas-reframe\apps\admin\src\pages\run-detail\index.tsx`
-- Modify: `D:\CodexFolder\.worktrees\load-testing-saas-reframe\apps\admin\src\pages\overview\index.tsx`
-
-- [ ] Make the task list show event, session, ticket tier, quantity, node pool, and execution objective.
-- [ ] Add a dedicated ticket-task summary block to the battle station.
-- [ ] Update overview cards or recent-task rows so seeded defaults display their Chinese business labels cleanly.
-
-## Task 6: Verification
-
-**Files:**
-- No code changes required
-
-- [ ] Run `corepack pnpm --filter admin test`
-- [ ] Run `corepack pnpm --filter admin build`
-- [ ] Run any targeted shared-contract verification needed for `packages/contracts`
-- [ ] Confirm the local stack still serves the updated console at `http://localhost:5173/overview`
+- [2026-04-21-ticket-task-metadata-and-console-upgrade-design.md](../specs/2026-04-21-ticket-task-metadata-and-console-upgrade-design.md)
+- [2026-04-18-load-testing-saas-operator-guide.md](../guides/2026-04-18-load-testing-saas-operator-guide.md)
