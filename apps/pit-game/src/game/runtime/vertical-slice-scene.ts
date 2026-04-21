@@ -281,7 +281,7 @@ export function buildVerticalSliceScene(controller: VerticalSliceController) {
       this.cameras.main.setZoom(renderState.camera.zoom);
 
       const impactKey =
-        punchWindowKey ?? (snapshot.frame.cameraCue === 'impact' ? getVerticalSliceWindowKey(snapshot.frame) : null);
+        punchWindowKey ?? (renderState.camera.mode === 'impact' ? getVerticalSliceWindowKey(snapshot.frame) : null);
       if (punchDetected && impactKey && impactKey !== this.lastImpactKey) {
         this.cameras.main.shake(110, 0.0045);
         this.cameras.main.zoomTo(1.025, 90);

@@ -1,5 +1,4 @@
 import {
-  createVerticalSliceFrame,
   type SliceCameraCue,
   type SliceLightCue,
 } from '../domain/vertical-slice-director';
@@ -217,13 +216,8 @@ function resolvePlayerAnimation(session: VerticalSliceSession): SliceRenderState
   return 'move';
 }
 
-function resolveFrame(session: VerticalSliceSession) {
-  const frameAtMs = Math.min(session.elapsedMs, session.fixture.profile.durationMs - 1);
-  return createVerticalSliceFrame(session.fixture, frameAtMs);
-}
-
 export function createSliceRenderState(session: VerticalSliceSession): SliceRenderState {
-  const frame = resolveFrame(session);
+  const { frame } = session;
   const centerDensity = frame.zonePressure.center;
   const edgeDensity = frame.zonePressure.edge;
   const animation = resolvePlayerAnimation(session);
