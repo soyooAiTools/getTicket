@@ -8,14 +8,6 @@ import {
 } from '../game/runtime/vertical-slice-audio';
 import { MinorityThreatRunOverlay } from './MinorityThreatRunOverlay';
 
-function formatSummary(summary: {
-  label: 'Survived' | 'Dropped';
-  downCount: number;
-  hitWindows: number;
-}) {
-  return `${summary.label} | Down ${summary.downCount} | Hits ${summary.hitWindows}`;
-}
-
 export function MinorityThreatShell() {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -32,10 +24,10 @@ export function MinorityThreatShell() {
     downCount: number;
     hitWindows: number;
   } | null>(controller.getSnapshot().summary);
+  const [isRunning, setIsRunning] = useState(controller.isRunning());
   const [loadedFileName, setLoadedFileName] = useState<string | null>(null);
   const [isAudioReady, setIsAudioReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const summaryText = summary ? formatSummary(summary) : null;
 
   const releaseAudio = (revokeObjectUrl: boolean) => {
     audioCleanupRef.current?.();
@@ -59,6 +51,7 @@ export function MinorityThreatShell() {
   useEffect(() => {
     return controller.subscribe((nextSession) => {
       setSummary(nextSession.summary);
+      setIsRunning(controller.isRunning());
     });
   }, [controller]);
 
@@ -176,25 +169,13 @@ export function MinorityThreatShell() {
             loadedFileName === minorityThreatVerticalSlice.audio.fileName &&
             isAudioReady
           }
-          isRunning={controller.isRunning()}
+          isRunning={isRunning}
           result={summary}
           onLoadSong={() => fileInputRef.current?.click()}
           onStart={startSlice}
           onRestart={startSlice}
         />
-        <div
-          className='minority-shell__copy minority-shell__copy--legacy'
-          aria-hidden='true'
-        >
-          <p className='minority-shell__eyebrow'>Vertical Slice</p>
-          <h1>Minority Threat Vertical Slice</h1>
-          <p>30 seconds of authored pit violence.</p>
-          <p>Load the exact song file to start the slice.</p>
-          <p>{minorityThreatVerticalSlice.audio.fileName}</p>
-          {loadedFileName ? <p>Loaded: {loadedFileName}</p> : null}
-          {error ? <p className='minority-shell__error'>{error}</p> : null}
-          {summaryText ? <p className='minority-shell__summary'>{summaryText}</p> : null}
-        </div>
+        {error ? <p className='minority-shell__error'>{error}</p> : null}
       </div>
       <input
         ref={fileInputRef}
