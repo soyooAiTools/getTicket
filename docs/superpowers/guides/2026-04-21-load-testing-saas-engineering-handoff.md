@@ -36,6 +36,8 @@
   [2026-04-18-load-testing-saas-reframe-design.md](../specs/2026-04-18-load-testing-saas-reframe-design.md)
 - 操作/运行手册：
   [2026-04-18-load-testing-saas-operator-guide.md](./2026-04-18-load-testing-saas-operator-guide.md)
+- 面向研发团队的转发模板：
+  [2026-04-22-load-testing-saas-team-handoff-message.md](./2026-04-22-load-testing-saas-team-handoff-message.md)
 - 重构实施记录：
   [2026-04-18-load-testing-saas-reframe-implementation.md](../plans/2026-04-18-load-testing-saas-reframe-implementation.md)
 - Real HTTP Probe 详细实现过程：

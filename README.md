@@ -23,6 +23,8 @@
   [2026-04-18-load-testing-saas-operator-guide.md](docs/superpowers/guides/2026-04-18-load-testing-saas-operator-guide.md)
 - 研发交接：
   [2026-04-21-load-testing-saas-engineering-handoff.md](docs/superpowers/guides/2026-04-21-load-testing-saas-engineering-handoff.md)
+- 团队转发模板：
+  [2026-04-22-load-testing-saas-team-handoff-message.md](docs/superpowers/guides/2026-04-22-load-testing-saas-team-handoff-message.md)
 - 重构实施记录：
   [2026-04-18-load-testing-saas-reframe-implementation.md](docs/superpowers/plans/2026-04-18-load-testing-saas-reframe-implementation.md)
 - Real HTTP Probe 历史执行计划：
