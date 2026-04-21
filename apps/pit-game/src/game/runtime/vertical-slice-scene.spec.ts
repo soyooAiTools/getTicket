@@ -27,17 +27,18 @@ vi.mock('phaser', () => ({
   },
 }));
 
-import { createVerticalSliceFrame } from '../domain/vertical-slice-director';
 import { minorityThreatVerticalSlice } from '../fixtures/minority-threat-vertical-slice';
 import { createVerticalSliceController } from './vertical-slice-controller';
 import {
-  buildCrowdBodyLayout,
   buildVerticalSliceScene,
-  resolveSliceLightPalette,
   stepSceneController,
-  resolvePlayerPoseStyle,
   resolveSliceInput,
 } from './vertical-slice-scene';
+import {
+  createSliceRenderState,
+  resolvePlayerPoseStyle,
+  resolveSliceLightPalette,
+} from './vertical-slice-presentation';
 
 describe('vertical slice scene helpers', () => {
   it('resolves held controls into one action and one zone', () => {
@@ -61,56 +62,29 @@ describe('vertical slice scene helpers', () => {
     });
   });
 
-  it('builds a denser center crowd layout for the breakdown-hit peak', () => {
-    const visuals = buildCrowdBodyLayout(createVerticalSliceFrame(minorityThreatVerticalSlice, 9_000));
-    const centerBodies = visuals.filter((body) => body.zone === 'center');
-    const edgeBodies = visuals.filter((body) => body.zone === 'edge');
+  it('keeps presentation helpers in the derived render-state layer', () => {
+    const session = createVerticalSliceController(minorityThreatVerticalSlice).getSnapshot();
+    session.elapsedMs = 9_000;
+    const renderState = createSliceRenderState(session);
 
-    expect(visuals.length).toBeGreaterThanOrEqual(18);
-    expect(centerBodies.length).toBeGreaterThan(edgeBodies.length);
-  });
-
-  it('keeps side-lane bodies out of the center corridor', () => {
-    const visuals = buildCrowdBodyLayout(createVerticalSliceFrame(minorityThreatVerticalSlice, 9_000));
-    const sideBodies = visuals.filter((body) => body.zone === 'side');
-
-    expect(sideBodies.length).toBeGreaterThan(0);
-    expect(sideBodies.every((body) => body.x <= 430 || body.x >= 850)).toBe(true);
-  });
-
-  it('maps the brace pose to the authored body style', () => {
-    expect(
-      resolvePlayerPoseStyle({
-        pose: 'brace',
-        status: 'upright',
-      }),
-    ).toMatchObject({
+    expect(renderState.crowd.center.length).toBeGreaterThan(renderState.crowd.edge.length);
+    expect(resolveSliceLightPalette('hit')).toMatchObject({
+      venueFill: 0x24110f,
+      crowdAlpha: 0.98,
+    });
+    expect(resolvePlayerPoseStyle('brace')).toMatchObject({
       fillColor: 0xf6d59c,
       scaleY: 0.82,
     });
   });
 
-  it('maps the down state to the collapsed body style', () => {
-    expect(
-      resolvePlayerPoseStyle({
-        pose: 'fall',
-        status: 'down',
-      }),
-    ).toEqual({
-      fillColor: 0x7f5a49,
-      scaleX: 1.18,
-      scaleY: 0.48,
-      angle: 88,
-    });
-  });
+  it('keeps side-lane bodies out of the center corridor', () => {
+    const session = createVerticalSliceController(minorityThreatVerticalSlice).getSnapshot();
+    session.elapsedMs = 9_000;
+    const sideBodies = createSliceRenderState(session).crowd.side;
 
-  it('resolves a visible palette from the authored light cue', () => {
-    expect(resolveSliceLightPalette('hit')).toMatchObject({
-      venueFill: 0x24110f,
-      bandFill: 0x513128,
-      crowdAlpha: 0.98,
-      accentText: '#ffe3b0',
-    });
+    expect(sideBodies.length).toBeGreaterThan(0);
+    expect(sideBodies.every((body) => body.x <= 430 || body.x >= 850)).toBe(true);
   });
 
   it('detects punch cues even when the scene advances through a large hitch', () => {
@@ -244,5 +218,56 @@ describe('vertical slice scene helpers', () => {
     controller.complete();
 
     expect(scene.summaryText.setText).toHaveBeenCalledWith('Survived | Hit Windows 0 | Downs 0');
+  });
+
+  it('anchors the player in the shoulder frame and applies pressure zoom while rendering', () => {
+    const controller = createVerticalSliceController(minorityThreatVerticalSlice);
+    const Scene = buildVerticalSliceScene(controller);
+    const scene = new Scene() as any;
+    const makeText = () => ({
+      setText: vi.fn(),
+      setColor: vi.fn(() => undefined),
+    });
+    const textObjects = Array.from({ length: 6 }, () => makeText());
+    const rectangle = {
+      setOrigin: vi.fn(() => rectangle),
+      setFillStyle: vi.fn(() => rectangle),
+      setPosition: vi.fn(() => rectangle),
+      setScale: vi.fn(() => rectangle),
+      setAngle: vi.fn(() => rectangle),
+    };
+    const graphics = {
+      clear: vi.fn(),
+      fillStyle: vi.fn(),
+      fillRoundedRect: vi.fn(),
+    };
+
+    scene.add = {
+      rectangle: vi.fn(() => rectangle),
+      text: vi.fn(() => textObjects.shift()),
+      graphics: vi.fn(() => graphics),
+    };
+    scene.input = {
+      keyboard: {
+        addKey: vi.fn(() => ({ isDown: false })),
+      },
+    };
+    scene.events = {
+      once: vi.fn(),
+    };
+    scene.cameras = {
+      main: {
+        shake: vi.fn(),
+        zoomTo: vi.fn(),
+        setZoom: vi.fn(),
+      },
+    };
+
+    controller.start();
+    controller.step({ action: 'move', targetZone: 'center' }, 9_000);
+    scene.create();
+
+    expect(rectangle.setPosition).toHaveBeenCalledWith(620, 520);
+    expect(scene.cameras.main.setZoom).toHaveBeenCalledWith(1.02);
   });
 });

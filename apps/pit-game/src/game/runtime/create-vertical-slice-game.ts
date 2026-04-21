@@ -9,7 +9,7 @@ export function createVerticalSliceGame(container: HTMLElement, controller: Vert
     parent: container,
     width: 1280,
     height: 720,
-    backgroundColor: '#060505',
+    backgroundColor: '#050403',
     scene: [buildVerticalSliceScene(controller)],
   });
 }
