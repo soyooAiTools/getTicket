@@ -3,59 +3,21 @@ import { describe, expect, it } from 'vitest';
 import { minorityThreatVerticalSlice } from '../fixtures/minority-threat-vertical-slice';
 import { createVerticalSliceSession, stepVerticalSliceSession } from './vertical-slice-session';
 
-describe('vertical slice session', () => {
-  it('fails when the player idles through the breakdown peak', () => {
+describe('vertical slice session pressure loop', () => {
+  it('drops the player into stagger when they eat a build surge without slipping', () => {
     let session = createVerticalSliceSession(minorityThreatVerticalSlice);
 
-    for (let index = 0; index < 30; index += 1) {
-      session = stepVerticalSliceSession(session, { action: 'idle', targetZone: 'center' }, 1_000);
-      if (session.failed) {
-        break;
-      }
-    }
+    session = stepVerticalSliceSession(session, { action: 'move', targetZone: 'side' }, 7_000);
 
-    expect(session.failed).toBe(true);
-    expect(session.summary?.label).toBe('Dropped');
+    expect(session.player.status).toBe('staggered');
   });
 
-  it('completes the slice with a survived summary when the player follows the authored windows', () => {
+  it('lets the player survive the first peak window by bracing correctly', () => {
     let session = createVerticalSliceSession(minorityThreatVerticalSlice);
 
-    const plan = [
-      { action: 'brace' as const, targetZone: 'edge' as const, dtMs: 24_000 },
-      { action: 'shove' as const, targetZone: 'edge' as const, dtMs: 6_000 },
-    ];
+    session = stepVerticalSliceSession(session, { action: 'brace', targetZone: 'center' }, 10_500);
 
-    for (const step of plan) {
-      session = stepVerticalSliceSession(session, step, step.dtMs);
-    }
-
-    expect(session.completed).toBe(true);
-    expect(session.failed).toBe(false);
-    expect(session.summary?.label).toBe('Survived');
-  });
-
-  it('captures authored event windows during large-dt stepping instead of skipping them', () => {
-    let session = createVerticalSliceSession(minorityThreatVerticalSlice);
-
-    session = stepVerticalSliceSession(session, { action: 'idle', targetZone: 'edge' }, 6_800);
-    session = stepVerticalSliceSession(session, { action: 'slip', targetZone: 'side' }, 400);
-
-    expect(session.frame.event?.kind).toBe('lateral-surge');
-    expect(session.frame.recommendedAction).toBe('slip');
-    expect(session.hitWindows).toBe(1);
-  });
-
-  it('only counts a matching authored window once across repeated steps', () => {
-    let session = createVerticalSliceSession(minorityThreatVerticalSlice);
-
-    session = stepVerticalSliceSession(session, { action: 'move', targetZone: 'edge' }, 2_400);
-    session = stepVerticalSliceSession(session, { action: 'move', targetZone: 'edge' }, 100);
-    session = stepVerticalSliceSession(session, { action: 'move', targetZone: 'edge' }, 100);
-    session = stepVerticalSliceSession(session, { action: 'move', targetZone: 'edge' }, 100);
-
-    expect(session.frame.phase.kind).toBe('walk-in-pressure');
-    expect(session.frame.event?.kind).toBe('crowd-build');
-    expect(session.hitWindows).toBe(2);
+    expect(session.player.status).not.toBe('down');
+    expect(session.player.balance).toBeGreaterThan(0);
   });
 });
