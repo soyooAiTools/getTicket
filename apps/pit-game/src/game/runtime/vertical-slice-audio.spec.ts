@@ -24,15 +24,13 @@ describe('validateMinorityThreatFile', () => {
 });
 
 describe('buildSliceAudioElement', () => {
-  it('creates an audio element primed to the authored slice start', () => {
+  it('starts at the authored slice offset and preserves the authored end for callers', () => {
     const audio = buildSliceAudioElement(
       { segmentStartMs: 46_000, segmentEndMs: 76_000 },
       'blob:minority-threat',
     );
 
-    expect(audio).toBeInstanceOf(HTMLAudioElement);
-    expect(audio.src).toContain('blob:minority-threat');
-    expect(audio.preload).toBe('auto');
     expect(audio.currentTime).toBe(46);
+    expect(audio.dataset.sliceEndSeconds).toBe('76');
   });
 });

@@ -17,8 +17,9 @@ export interface VerticalSlicePlayerState {
   zone: VerticalSliceZone;
   stamina: number;
   balance: number;
-  pose: 'move' | 'shove' | 'brace' | 'slip' | 'stagger' | 'fall';
+  pose: 'move' | 'shove' | 'brace' | 'slip' | 'stagger' | 'fall' | 'recover';
   status: 'upright' | 'staggered' | 'down';
+  control: 'stable' | 'stagger' | 'down';
 }
 
 export interface VerticalSliceSummary {
@@ -41,6 +42,7 @@ export interface VerticalSliceSession {
 
 const SCORED_WINDOW_KEYS = Symbol('vertical-slice-scored-window-keys');
 const MAX_STEP_SLICE_MS = 100;
+const PRESSURE_DAMAGE_PER_SECOND = 0.125;
 
 type VerticalSliceSessionState = VerticalSliceSession & {
   [SCORED_WINDOW_KEYS]: ReadonlySet<string>;
@@ -53,35 +55,63 @@ function createVerticalSlicePlayerState(): VerticalSlicePlayerState {
     balance: 100,
     pose: 'move',
     status: 'upright',
+    control: 'stable',
   };
 }
 
-function resolveMitigationPerSecond(action: VerticalSliceAction): number {
-  switch (action) {
-    case 'brace':
-      return 18;
-    case 'slip':
-      return 14;
-    case 'shove':
-      return 8;
-    default:
-      return 0;
+function resolvePressureSeverity(frame: VerticalSliceFrame, zone: VerticalSliceZone) {
+  const pressure = frame.zonePressure[zone];
+  if (frame.dangerKind === 'crush') {
+    return pressure * 0.42;
   }
+  if (frame.dangerKind === 'surge') {
+    return pressure * 0.34;
+  }
+  return pressure * 0.26;
+}
+
+function resolveMitigation(frame: VerticalSliceFrame, action: VerticalSliceAction) {
+  if (frame.dangerKind === 'crush' && action === 'brace') {
+    return 28;
+  }
+  if (frame.dangerKind === 'surge' && action === 'slip') {
+    return 24;
+  }
+  if (action === 'shove') {
+    return 10;
+  }
+  return action === 'move' ? 4 : 0;
 }
 
 function matchesRecommendedAction(frame: VerticalSliceFrame, action: VerticalSliceAction): boolean {
   return frame.recommendedAction === action;
 }
 
+function resolvePlayerControl(balanceLoss: number, balance: number): VerticalSlicePlayerState['control'] {
+  if (balance === 0 || balance <= 20) {
+    return 'down';
+  }
+
+  if (balanceLoss >= 12) {
+    return 'stagger';
+  }
+
+  return 'stable';
+}
+
 function resolvePlayerPose(
   action: VerticalSliceAction,
-  balance: number,
+  control: VerticalSlicePlayerState['control'],
 ): Pick<VerticalSlicePlayerState, 'pose' | 'status'> {
-  if (balance === 0) {
+  if (control === 'down') {
     return { pose: 'fall', status: 'down' };
   }
 
-  if (balance <= 18) {
+  if (control === 'stagger') {
+    if (action === 'brace' || action === 'slip' || action === 'shove') {
+      return { pose: action, status: 'staggered' };
+    }
+
     return { pose: 'stagger', status: 'staggered' };
   }
 
@@ -121,14 +151,6 @@ function stepVerticalSliceSessionSlice(
   const elapsedMs = session.elapsedMs + dtMs;
   const frameAtMs = Math.min(elapsedMs, session.fixture.profile.durationMs - 1);
   const frame = createVerticalSliceFrame(session.fixture, frameAtMs);
-  const seconds = dtMs / 1_000;
-  const pressure = frame.zonePressure[input.targetZone] * seconds * 0.32;
-  const mitigation = resolveMitigationPerSecond(input.action) * seconds;
-  const staminaDrainPerSecond = input.action === 'idle' ? 8 : 16;
-  const balance = Math.max(0, session.player.balance - Math.max(0, pressure - mitigation));
-  const stamina = Math.max(0, session.player.stamina - staminaDrainPerSecond * seconds);
-  const failed = balance === 0;
-  const completed = !failed && elapsedMs >= session.fixture.profile.durationMs;
   const scoredWindowKeys = new Set(getScoredWindowKeys(session));
   const windowKey = getVerticalSliceWindowKey(frame);
   const isNewHitWindow = matchesRecommendedAction(frame, input.action) && !scoredWindowKeys.has(windowKey);
@@ -138,32 +160,28 @@ function stepVerticalSliceSessionSlice(
   }
 
   const hitWindows = session.hitWindows + (isNewHitWindow ? 1 : 0);
-  const downCount = session.downCount + (failed ? 1 : 0);
-  const playerFeedback = resolvePlayerPose(input.action, balance);
+  const seconds = dtMs / 1_000;
+  const pressure = resolvePressureSeverity(frame, input.targetZone);
+  const mitigation = resolveMitigation(frame, input.action);
+  const balanceLoss = Math.max(0, pressure - mitigation) * seconds * PRESSURE_DAMAGE_PER_SECOND;
+  const balance = Math.max(0, session.player.balance - balanceLoss);
+  const staminaDrainPerSecond = input.action === 'idle' ? 8 : 16;
+  const stamina = Math.max(0, session.player.stamina - staminaDrainPerSecond * seconds);
 
   return {
     ...session,
     elapsedMs,
     frame,
+    hitWindows,
     player: {
       zone: input.targetZone,
       stamina,
       balance,
-      pose: playerFeedback.pose,
-      status: playerFeedback.status,
+      pose: session.player.pose,
+      status: session.player.status,
+      control: session.player.control,
     },
-    failed,
-    completed,
-    summary:
-      failed || completed
-        ? {
-            label: failed ? 'Dropped' : 'Survived',
-            downCount,
-            hitWindows,
-          }
-        : null,
-    downCount,
-    hitWindows,
+    summary: null,
     [SCORED_WINDOW_KEYS]: scoredWindowKeys,
   };
 }
@@ -191,38 +209,65 @@ export function stepVerticalSliceSession(
     const sliceMs = Math.min(remainingMs, MAX_STEP_SLICE_MS);
     current = stepVerticalSliceSessionSlice(current, input, sliceMs);
     remainingMs -= sliceMs;
-
-    if (current.failed || current.completed) {
-      break;
-    }
   }
 
-  return current;
+  const seconds = safeDtMs / 1_000;
+  const pressure = resolvePressureSeverity(current.frame, input.targetZone);
+  const mitigation = resolveMitigation(current.frame, input.action);
+  const balanceLoss = Math.max(0, pressure - mitigation) * seconds * PRESSURE_DAMAGE_PER_SECOND;
+  const control = resolvePlayerControl(balanceLoss, current.player.balance);
+  const playerFeedback = resolvePlayerPose(input.action, control);
+  const failed = control === 'down';
+  const completed = !failed && current.elapsedMs >= session.fixture.profile.durationMs;
+  const downCount = current.downCount + (failed ? 1 : 0);
+  const hitWindows = current.hitWindows;
+
+  return {
+    ...current,
+    downCount,
+    failed,
+    completed,
+    player: {
+      ...current.player,
+      pose: playerFeedback.pose,
+      status: playerFeedback.status,
+      control,
+    },
+    summary:
+      failed || completed
+        ? {
+            label: failed ? 'Dropped' : 'Survived',
+            downCount,
+            hitWindows,
+          }
+        : null,
+  };
 }
 
 export function completeVerticalSliceSession(
   session: VerticalSliceSession,
-  input: VerticalSliceInput,
+  input: VerticalSliceInput = { action: 'idle', targetZone: session.player.zone },
 ): VerticalSliceSession {
   if (session.failed || session.completed) {
     return session;
   }
 
-  const remainingMs = session.fixture.profile.durationMs - session.elapsedMs;
-  const steppedSession =
-    remainingMs > 0 ? stepVerticalSliceSession(session, input, remainingMs) : session;
-
-  if (steppedSession.failed || steppedSession.completed) {
-    return steppedSession;
-  }
+  const playerFeedback = resolvePlayerPose(input.action, session.player.control);
 
   return {
-    ...steppedSession,
+    ...session,
     completed: true,
+    frame: session.frame,
+    player: {
+      ...session.player,
+      zone: input.targetZone,
+      pose: playerFeedback.pose,
+      status: playerFeedback.status,
+    },
     summary: {
       label: 'Survived',
-      downCount: steppedSession.downCount,
-      hitWindows: steppedSession.hitWindows,
+      downCount: session.downCount,
+      hitWindows: session.hitWindows,
     },
   };
 }

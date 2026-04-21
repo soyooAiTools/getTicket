@@ -1,26 +1,20 @@
-import type { VerticalSliceEvent, VerticalSliceFixture, VerticalSlicePhase } from './vertical-slice';
+import type {
+  VerticalSliceCameraCue,
+  VerticalSliceEvent,
+  VerticalSliceFixture,
+  VerticalSliceFrame,
+  VerticalSliceLightCue,
+  VerticalSliceRecommendedAction,
+} from './vertical-slice';
 
-export type SliceRecommendedAction = 'move' | 'shove' | 'brace' | 'slip';
-export type SliceCameraCue = 'steady' | 'build' | 'punch' | 'collapse';
-export type SliceLightCue = 'room' | 'tension' | 'hit' | 'aftershock';
-
-export interface VerticalSliceFrame {
-  phase: VerticalSlicePhase;
-  event: VerticalSliceEvent | null;
-  zonePressure: {
-    front: number;
-    center: number;
-    edge: number;
-    side: number;
-  };
-  recommendedAction: SliceRecommendedAction;
-  cameraCue: SliceCameraCue;
-  lightCue: SliceLightCue;
-}
+export type SliceRecommendedAction = VerticalSliceRecommendedAction;
+export type SliceCameraCue = VerticalSliceCameraCue;
+export type SliceLightCue = VerticalSliceLightCue;
+export type { VerticalSliceFrame } from './vertical-slice';
 
 const ACTIVE_EVENT_WINDOW_MS = 250;
 
-function findPhase(fixture: VerticalSliceFixture, atMs: number): VerticalSlicePhase {
+function findPhase(fixture: VerticalSliceFixture, atMs: number) {
   const phase = fixture.phases.find((candidate) => atMs >= candidate.startMs && atMs < candidate.endMs);
 
   if (!phase) {
@@ -51,48 +45,50 @@ export function createVerticalSliceFrame(fixture: VerticalSliceFixture, atMs: nu
   const phase = findPhase(fixture, atMs);
   const event = findActiveEvent(fixture, atMs);
 
-  if (event?.kind === 'breakdown-hit') {
+  if (phase.kind === 'walk-in-pressure') {
     return {
       phase,
       event,
-      zonePressure: { front: 88, center: 100, edge: 74, side: 78 },
-      recommendedAction: 'brace',
-      cameraCue: 'punch',
-      lightCue: 'hit',
+      dangerKind: 'push',
+      recommendedAction: 'move',
+      cameraCue: 'follow',
+      lightCue: 'room',
+      zonePressure: { front: 42, center: 48, edge: 22, side: 28 },
     };
   }
 
-  if (phase.kind === 'tension-in') {
+  if (phase.kind === 'build') {
     return {
       phase,
       event,
-      zonePressure: { front: 50, center: 58, edge: 30, side: 36 },
-      recommendedAction: 'move',
-      cameraCue: 'build',
-      lightCue: 'tension',
+      dangerKind: event?.kind === 'lateral-surge' ? 'surge' : 'push',
+      recommendedAction: event?.kind === 'lateral-surge' ? 'slip' : 'move',
+      cameraCue: event?.kind === 'lateral-surge' ? 'pressure' : 'follow',
+      lightCue: 'build',
+      zonePressure: { front: 62, center: 72, edge: 38, side: 58 },
     };
   }
 
   if (phase.kind === 'breakdown-peak') {
-    const lateralSurgeActive = event?.kind === 'lateral-surge';
-
     return {
       phase,
       event,
-      zonePressure: { front: 82, center: 92, edge: 66, side: 72 },
-      recommendedAction: lateralSurgeActive ? 'slip' : 'brace',
-      cameraCue: lateralSurgeActive ? 'build' : 'steady',
-      lightCue: 'tension',
+      dangerKind: 'crush',
+      recommendedAction: event?.kind === 'breakdown-hit' ? 'brace' : 'shove',
+      cameraCue: event?.kind === 'breakdown-hit' ? 'impact' : 'pressure',
+      lightCue: event?.kind === 'breakdown-hit' ? 'hit' : 'build',
+      zonePressure: { front: 86, center: 100, edge: 68, side: 76 },
     };
   }
 
   return {
     phase,
     event,
-    zonePressure: { front: 54, center: 62, edge: 34, side: 42 },
+    dangerKind: 'aftershock',
     recommendedAction: 'shove',
-    cameraCue: 'steady',
+    cameraCue: 'follow',
     lightCue: 'aftershock',
+    zonePressure: { front: 48, center: 58, edge: 30, side: 36 },
   };
 }
 

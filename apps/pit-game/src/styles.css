@@ -18,17 +18,101 @@ body {
   box-sizing: border-box;
 }
 
-.app-shell__workspace {
-  display: grid;
-  gap: 18px;
+.app-shell--game {
+  position: relative;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(122, 32, 21, 0.35), transparent 34%),
+    linear-gradient(180deg, #050505 0%, #0e0908 45%, #040404 100%);
 }
 
-.app-shell__panel {
-  display: grid;
+.app-shell__lab-link {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 20;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 244, 224, 0.18);
+  background: rgba(5, 5, 5, 0.74);
+  color: #f6e8d1;
 }
 
-.app-shell__panel--slice {
+.minority-shell {
+  min-height: 100vh;
+}
+
+.minority-shell__stage {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+.minority-shell__mount {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 50% 18%, rgba(242, 211, 154, 0.08), transparent 24%),
+    linear-gradient(180deg, rgba(11, 7, 6, 0.38), rgba(6, 4, 4, 0.7));
+}
+
+.minority-shell__error {
+  position: absolute;
+  left: 32px;
+  bottom: 188px;
+  z-index: 5;
+  margin: 0;
+  max-width: 420px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 143, 114, 0.32);
+  background: rgba(43, 11, 9, 0.88);
+  color: #ffd7c9;
+  line-height: 1.4;
+}
+
+.slice-overlay {
+  position: absolute;
+  left: 32px;
+  bottom: 32px;
+  z-index: 4;
   display: grid;
+  gap: 10px;
+  max-width: 420px;
+  padding: 22px 24px;
+  border: 1px solid rgba(255, 233, 196, 0.18);
+  background: rgba(12, 9, 8, 0.84);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.38);
+}
+
+.slice-overlay--result {
+  max-width: 340px;
+}
+
+.slice-overlay h1,
+.slice-overlay h2,
+.slice-overlay p {
+  margin: 0;
+}
+
+.slice-overlay h1,
+.slice-overlay h2 {
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 0.95;
+}
+
+.slice-overlay__eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.72rem;
+  color: #f2d39a;
+}
+
+.slice-overlay__file,
+.slice-overlay__loaded {
+  color: #d9c7b6;
+}
+
+.slice-overlay__actions {
+  display: grid;
+  gap: 10px;
 }
 
 .mode-bar {

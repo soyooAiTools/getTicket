@@ -18,5 +18,6 @@ export function buildSliceAudioElement(
   audio.src = objectUrl;
   audio.preload = 'auto';
   audio.currentTime = source.segmentStartMs / 1_000;
+  audio.dataset.sliceEndSeconds = String(source.segmentEndMs / 1_000);
   return audio;
 }

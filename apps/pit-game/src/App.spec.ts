@@ -1,19 +1,23 @@
 // @vitest-environment jsdom
 
-import { act, createElement } from 'react';
+import { act, createElement, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from './App';
-import { useState } from 'react';
 
 vi.mock('./components/MinorityThreatShell', () => ({
   MinorityThreatShell: () =>
-    createElement('section', { 'data-testid': 'minority-threat-shell' }, 'Minority Threat Slice'),
+    createElement(
+      'section',
+      { 'data-testid': 'minority-threat-shell' },
+      '30-second playable slice',
+      createElement('button', { type: 'button' }, 'Load Minority Threat.mp3'),
+    ),
 }));
 
 vi.mock('./components/PrototypeWorkbench', () => ({
-  PrototypeWorkbench: ({ onBack }: { onBack: () => void }) => {
+  PrototypeWorkbench: ({ onBack }: { active: boolean; onBack: () => void }) => {
     const [note, setNote] = useState('');
 
     return createElement(
@@ -33,7 +37,7 @@ vi.mock('./components/PrototypeWorkbench', () => ({
           type: 'button' as const,
           onClick: onBack,
         },
-        'Back to slice',
+        'Back to Slice',
       ),
       createElement('p', { 'data-testid': 'lab-note-value' }, note),
     );
@@ -84,31 +88,38 @@ describe('App mode switching', () => {
     document.body.innerHTML = '';
   });
 
-  it('shows the Minority Threat slice by default and opens the authoring lab on demand', () => {
+  it('boots into the playable slice and keeps the lab as a secondary control', () => {
     const view = renderApp();
-    const sliceShell = () => view.container.querySelector('.app-shell__panel--slice');
-    const labShell = () => view.container.querySelector('.app-shell__panel--lab');
+    const labShell = () =>
+      view.container.querySelector('[data-testid="prototype-workbench-shell"]');
     const labNote = () => view.container.querySelector('[data-testid="lab-note-value"]');
 
-    expect(sliceShell()).not.toBeNull();
+    expect(view.container.textContent).toContain('30-second playable slice');
+    expect(view.container.textContent).toContain('Load Minority Threat.mp3');
+    expect(view.container.textContent).toContain('Authoring Lab');
     expect(labShell()).toBeNull();
 
-    clickButton(view.container, 'Open authoring lab');
+    clickButton(view.container, 'Authoring Lab');
 
-    expect(sliceShell()).toBeNull();
     expect(labShell()).not.toBeNull();
     expect(labShell()?.getAttribute('hidden')).toBeNull();
+    expect(view.container.textContent).toContain('Lab Open');
 
     clickButton(view.container, 'Set lab note');
     expect(labNote()?.textContent).toBe('persist me');
 
-    clickButton(view.container, 'Back to slice');
+    const workbench = view.container.querySelector('[data-testid="prototype-workbench"]');
 
-    expect(sliceShell()).not.toBeNull();
+    if (!workbench) {
+      throw new Error('Could not find prototype workbench');
+    }
+
+    clickButton(workbench as HTMLElement, 'Back to Slice');
+
     expect(labShell()).not.toBeNull();
     expect(labShell()?.getAttribute('hidden')).toBe('');
 
-    clickButton(view.container, 'Open authoring lab');
+    clickButton(view.container, 'Authoring Lab');
 
     expect(labNote()?.textContent).toBe('persist me');
     view.unmount();

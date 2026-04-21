@@ -2,14 +2,13 @@ import Phaser from 'phaser';
 
 import {
   getVerticalSliceWindowKey,
-  type SliceLightCue,
   type VerticalSliceFrame,
 } from '../domain/vertical-slice-director';
 import type { VerticalSliceController } from './vertical-slice-controller';
+import { createSliceRenderState } from './vertical-slice-presentation';
 import type {
   VerticalSliceAction,
   VerticalSliceInput,
-  VerticalSlicePlayerState,
   VerticalSliceSession,
   VerticalSliceZone,
 } from './vertical-slice-session';
@@ -25,58 +24,13 @@ export interface SliceControlState {
   side: boolean;
 }
 
-export interface CrowdBodyVisual {
-  zone: VerticalSliceZone;
-  x: number;
-  y: number;
-  tint: number;
-  scale: number;
-}
-
-export interface PlayerPoseStyle {
-  fillColor: number;
-  scaleX: number;
-  scaleY: number;
-  angle: number;
-}
-
-export interface SliceLightPalette {
-  venueFill: number;
-  bandFill: number;
-  barrierFill: number;
-  pitFill: number;
-  edgeFill: number;
-  panelFill: number;
-  accentText: string;
-  bodyAlpha: number;
-  crowdAlpha: number;
-}
-
 export interface SceneStepResult {
   snapshot: VerticalSliceSession;
   punchDetected: boolean;
   punchWindowKey: string | null;
 }
 
-const ZONE_BOUNDS: Record<VerticalSliceZone, { centerX: number; centerY: number; width: number; height: number }> = {
-  front: { centerX: 640, centerY: 262, width: 640, height: 88 },
-  center: { centerX: 640, centerY: 438, width: 500, height: 220 },
-  edge: { centerX: 640, centerY: 624, width: 760, height: 80 },
-  side: { centerX: 640, centerY: 456, width: 920, height: 240 },
-};
-
-const ZONE_TINTS: Record<VerticalSliceZone, number> = {
-  front: 0xcf6f48,
-  center: 0xa65738,
-  edge: 0x6d4634,
-  side: 0x86513d,
-};
-
 const MAX_SCENE_STEP_MS = 100;
-
-function clamp(value: number, minimum: number, maximum: number): number {
-  return Math.max(minimum, Math.min(maximum, value));
-}
 
 function resolveTargetZone(state: SliceControlState, currentZone: VerticalSliceZone): VerticalSliceZone {
   if (state.front) {
@@ -118,163 +72,18 @@ export function resolveSliceInput(
   };
 }
 
-function zonePopulation(zone: VerticalSliceZone, pressure: number): number {
-  switch (zone) {
-    case 'center':
-      return 6 + Math.floor(pressure / 14);
-    case 'front':
-      return 3 + Math.floor(pressure / 22);
-    case 'side':
-      return 4 + Math.floor(pressure / 22);
-    case 'edge':
-      return 2 + Math.floor(pressure / 26);
-  }
-}
-
-function createZoneBodyVisuals(zone: VerticalSliceZone, count: number, pressure: number): CrowdBodyVisual[] {
-  const bounds = ZONE_BOUNDS[zone];
-  const visuals: CrowdBodyVisual[] = [];
-  const columns = Math.max(1, Math.ceil(Math.sqrt(count)));
-  const rows = Math.max(1, Math.ceil(count / columns));
-  const stepX = bounds.width / (columns + 1);
-  const stepY = bounds.height / (rows + 1);
-  const pressureScale = 0.78 + pressure / 260;
-
-  for (let index = 0; index < count; index += 1) {
-    const row = Math.floor(index / columns);
-    const column = index % columns;
-    const centeredX =
-      zone === 'side'
-        ? (column % 2 === 0 ? 274 : 1_006) + (row % 2 === 0 ? -18 : 18)
-        : bounds.centerX - bounds.width / 2 + stepX * (column + 1);
-    const centeredY = bounds.centerY - bounds.height / 2 + stepY * (row + 1);
-    const lateralOffset =
-      zone === 'side'
-        ? (index % 2 === 0 ? -1 : 1) * (18 + row * 6)
-        : (column - (columns - 1) / 2) * 6;
-    const verticalOffset = ((index % 3) - 1) * 5;
-
-    visuals.push({
-      zone,
-      x: centeredX + lateralOffset,
-      y: centeredY + verticalOffset,
-      tint: ZONE_TINTS[zone],
-      scale: clamp(pressureScale + ((index % 4) - 1.5) * 0.03, 0.74, 1.22),
-    });
-  }
-
-  return visuals;
-}
-
-export function buildCrowdBodyLayout(frame: VerticalSliceFrame): CrowdBodyVisual[] {
-  const counts = {
-    front: zonePopulation('front', frame.zonePressure.front),
-    center: zonePopulation('center', frame.zonePressure.center),
-    edge: zonePopulation('edge', frame.zonePressure.edge),
-    side: zonePopulation('side', frame.zonePressure.side),
-  };
-
-  return [
-    ...createZoneBodyVisuals('front', counts.front, frame.zonePressure.front),
-    ...createZoneBodyVisuals('center', counts.center, frame.zonePressure.center),
-    ...createZoneBodyVisuals('side', counts.side, frame.zonePressure.side),
-    ...createZoneBodyVisuals('edge', counts.edge, frame.zonePressure.edge),
-  ];
-}
-
-export function resolvePlayerPoseStyle(player: Pick<VerticalSlicePlayerState, 'pose' | 'status'>): PlayerPoseStyle {
-  if (player.status === 'down' || player.pose === 'fall') {
-    return { fillColor: 0x7f5a49, scaleX: 1.18, scaleY: 0.48, angle: 88 };
-  }
-
-  switch (player.pose) {
-    case 'brace':
-      return { fillColor: 0xf6d59c, scaleX: 0.96, scaleY: 0.82, angle: 0 };
-    case 'slip':
-      return { fillColor: 0xf6d59c, scaleX: 1.18, scaleY: 0.86, angle: -18 };
-    case 'shove':
-      return { fillColor: 0xf1c485, scaleX: 1.08, scaleY: 0.92, angle: 12 };
-    case 'stagger':
-      return { fillColor: 0xd28f72, scaleX: 1.02, scaleY: 0.88, angle: 14 };
-    default:
-      return { fillColor: 0xf9e4ba, scaleX: 1, scaleY: 1, angle: 0 };
-  }
-}
-
-export function resolveSliceLightPalette(lightCue: SliceLightCue): SliceLightPalette {
-  switch (lightCue) {
-    case 'room':
-      return {
-        venueFill: 0x130e0d,
-        bandFill: 0x25100f,
-        barrierFill: 0xb18a62,
-        pitFill: 0x241715,
-        edgeFill: 0x1a1211,
-        panelFill: 0x090808,
-        accentText: '#e8c894',
-        bodyAlpha: 0.92,
-        crowdAlpha: 0.84,
-      };
-    case 'tension':
-      return {
-        venueFill: 0x1c110f,
-        bandFill: 0x3d1f1a,
-        barrierFill: 0xc79e6b,
-        pitFill: 0x2d1815,
-        edgeFill: 0x201212,
-        panelFill: 0x110909,
-        accentText: '#ffce96',
-        bodyAlpha: 0.95,
-        crowdAlpha: 0.9,
-      };
-    case 'hit':
-      return {
-        venueFill: 0x24110f,
-        bandFill: 0x513128,
-        barrierFill: 0xf0c07f,
-        pitFill: 0x3a1e1a,
-        edgeFill: 0x261515,
-        panelFill: 0x170c0b,
-        accentText: '#ffe3b0',
-        bodyAlpha: 1,
-        crowdAlpha: 0.98,
-      };
-    case 'aftershock':
-      return {
-        venueFill: 0x171010,
-        bandFill: 0x2f1715,
-        barrierFill: 0xa67e63,
-        pitFill: 0x261919,
-        edgeFill: 0x1d1414,
-        panelFill: 0x0d0909,
-        accentText: '#d8b59d',
-        bodyAlpha: 0.9,
-        crowdAlpha: 0.8,
-      };
-  }
-}
-
-function resolvePlayerPosition(zone: VerticalSliceZone): { x: number; y: number } {
-  switch (zone) {
-    case 'front':
-      return { x: 640, y: 294 };
-    case 'center':
-      return { x: 640, y: 470 };
-    case 'side':
-      return { x: 980, y: 490 };
-    case 'edge':
-      return { x: 640, y: 632 };
-  }
-}
-
 function formatPhaseLabel(frame: VerticalSliceFrame): string {
   switch (frame.phase.kind) {
-    case 'tension-in':
-      return 'Phase: Tension In';
+    case 'walk-in-pressure':
+      return 'Phase: Walk-In Pressure';
+    case 'build':
+      return 'Phase: Build';
     case 'breakdown-peak':
       return 'Phase: Breakdown Peak';
     case 'aftershock':
       return 'Phase: Aftershock';
+    default:
+      return `Phase: ${frame.phase.kind}`;
   }
 }
 
@@ -296,14 +105,14 @@ export function stepSceneController(
   const safeDelta = Math.max(0, delta);
   let remainingMs = safeDelta;
   let snapshot = controller.getSnapshot();
-  let punchDetected = snapshot.frame.cameraCue === 'punch';
+  let punchDetected = snapshot.frame.cameraCue === 'impact';
   let punchWindowKey = punchDetected ? getVerticalSliceWindowKey(snapshot.frame) : null;
 
   while (remainingMs > 0) {
     const sliceMs = Math.min(remainingMs, maxStepMs);
     controller.step(input, sliceMs);
     snapshot = controller.getSnapshot();
-    if (snapshot.frame.cameraCue === 'punch') {
+    if (snapshot.frame.cameraCue === 'impact') {
       punchDetected = true;
       punchWindowKey = getVerticalSliceWindowKey(snapshot.frame);
     }
@@ -430,8 +239,14 @@ export function buildVerticalSliceScene(controller: VerticalSliceController) {
     }
 
     private renderSnapshot(snapshot: VerticalSliceSession, punchDetected: boolean, punchWindowKey: string | null) {
-      const bodyLayout = buildCrowdBodyLayout(snapshot.frame);
-      const palette = resolveSliceLightPalette(snapshot.frame.lightCue);
+      const renderState = createSliceRenderState(snapshot);
+      const bodyLayout = [
+        ...renderState.crowd.front,
+        ...renderState.crowd.center,
+        ...renderState.crowd.side,
+        ...renderState.crowd.edge,
+      ];
+      const { palette } = renderState.venue;
       this.crowdGraphics.clear();
 
       this.venueBackdrop.setFillStyle(palette.venueFill, palette.bodyAlpha);
@@ -446,6 +261,10 @@ export function buildVerticalSliceScene(controller: VerticalSliceController) {
       this.bandLabel.setColor(palette.accentText);
       this.barrierLabel.setColor(palette.accentText);
       this.edgeLabel.setColor(palette.accentText);
+      this.bandArea.setPosition(renderState.venue.stage.x, renderState.venue.stage.y + 22);
+      this.barrierLine.setPosition(renderState.venue.front.x, renderState.venue.front.y + 28);
+      this.pitFloor.setPosition(renderState.venue.center.x, renderState.venue.center.y);
+      this.edgeLane.setPosition(renderState.venue.edge.x, renderState.venue.edge.y);
 
       for (const body of bodyLayout) {
         const width = 22 * body.scale;
@@ -454,21 +273,21 @@ export function buildVerticalSliceScene(controller: VerticalSliceController) {
         this.crowdGraphics.fillRoundedRect(body.x - width / 2, body.y - height / 2, width, height, 8);
       }
 
-      const poseStyle = resolvePlayerPoseStyle(snapshot.player);
-      const playerPosition = resolvePlayerPosition(snapshot.player.zone);
-      this.player.setPosition(playerPosition.x, snapshot.player.status === 'down' ? playerPosition.y + 22 : playerPosition.y);
+      const poseStyle = renderState.player.poseStyle;
+      this.player.setPosition(renderState.player.x, renderState.player.y);
       this.player.setFillStyle(poseStyle.fillColor);
       this.player.setScale(poseStyle.scaleX, poseStyle.scaleY);
       this.player.setAngle(poseStyle.angle);
+      this.cameras.main.setZoom(renderState.camera.zoom);
 
-      const impactKey = punchWindowKey ?? (snapshot.frame.cameraCue === 'punch' ? getVerticalSliceWindowKey(snapshot.frame) : null);
+      const impactKey =
+        punchWindowKey ?? (renderState.camera.mode === 'impact' ? getVerticalSliceWindowKey(snapshot.frame) : null);
       if (punchDetected && impactKey && impactKey !== this.lastImpactKey) {
-        this.cameras.main.shake(120, 0.0045);
+        this.cameras.main.shake(110, 0.0045);
         this.cameras.main.zoomTo(1.025, 90);
         this.lastImpactKey = impactKey;
       } else if (!impactKey) {
         this.lastImpactKey = null;
-        this.cameras.main.setZoom(1);
       }
 
       this.phaseText.setText(formatPhaseLabel(snapshot.frame));

@@ -222,15 +222,16 @@ describe('MinorityThreatShell', () => {
     document.body.innerHTML = '';
   });
 
-  it('renders the authored song instructions and filename', async () => {
+  it('renders the game-first overlay copy and filename', async () => {
     const view = await renderShell();
 
     expect(view.container.textContent).toContain(
       'Minority Unit - Minority Threat.mp3',
     );
     expect(view.container.textContent).toContain(
-      'Load the exact song file to start the slice.',
+      '30-second playable slice',
     );
+    expect(view.container.textContent).toContain('Load Minority Threat.mp3');
     expect(view.container.textContent).not.toContain('C:/Users/Nick/Desktop');
 
     await view.unmount();
@@ -320,6 +321,8 @@ describe('MinorityThreatShell', () => {
     });
 
     expect(shellFixtures.startSpy).toHaveBeenCalledTimes(1);
+    expect(view.container.textContent).toContain('Running...');
+    expect(startButton.disabled).toBe(true);
 
     shellFixtures.pauseSpy.mockClear();
 
@@ -328,6 +331,39 @@ describe('MinorityThreatShell', () => {
     });
 
     expect(shellFixtures.pauseSpy).toHaveBeenCalledTimes(1);
+    expect(view.container.textContent).toContain('Start Slice');
+    expect(view.container.textContent).not.toContain('Running...');
+    expect(startButton.disabled).toBe(false);
+
+    await view.unmount();
+  });
+
+  it('does not advance the run until the audio play event fires', async () => {
+    const view = await renderShell();
+    const input = getFileInput(view.container);
+    const startButton = getStartButton(view.container);
+
+    selectFile(
+      input,
+      new File(['ok'], 'Minority Unit - Minority Threat.mp3', {
+        type: 'audio/mpeg',
+      }),
+    );
+    act(() => {
+      shellFixtures.currentAudio?.dispatchEvent(new Event('loadedmetadata'));
+    });
+
+    act(() => {
+      startButton.click();
+    });
+
+    expect(shellFixtures.startSpy).not.toHaveBeenCalled();
+
+    act(() => {
+      shellFixtures.currentAudio?.dispatchEvent(new Event('play'));
+    });
+
+    expect(shellFixtures.startSpy).toHaveBeenCalledTimes(1);
 
     await view.unmount();
   });
@@ -425,7 +461,7 @@ describe('MinorityThreatShell', () => {
     expect(shellFixtures.revokeObjectUrlCalls).toContain('blob:2');
   });
 
-  it('subscribes to controller summary updates and formats the result line', async () => {
+  it('shows the result overlay when the controller completes', async () => {
     const view = await renderShell();
 
     act(() => {
@@ -436,7 +472,34 @@ describe('MinorityThreatShell', () => {
       });
     });
 
-    expect(view.container.textContent).toContain('Survived | Down 2 | Hits 7');
+    expect(view.container.textContent).toContain('Run Complete');
+    expect(view.container.textContent).toContain('Survived');
+    expect(view.container.textContent).toContain('Downs: 2');
+    expect(view.container.textContent).toContain('Hit windows: 7');
+    expect(view.container.textContent).toContain('Replay Slice');
+
+    await view.unmount();
+  });
+
+  it('does not complete the run when playback crosses the authored segment end before play starts', async () => {
+    const view = await renderShell();
+    const input = getFileInput(view.container);
+
+    selectFile(
+      input,
+      new File(['ok'], 'Minority Unit - Minority Threat.mp3', {
+        type: 'audio/mpeg',
+      }),
+    );
+    act(() => {
+      if (shellFixtures.currentAudio) {
+        shellFixtures.currentAudio.currentTime = 76;
+        shellFixtures.currentAudio.dispatchEvent(new Event('timeupdate'));
+      }
+    });
+
+    expect(shellFixtures.completeSpy).not.toHaveBeenCalled();
+    expect(view.container.textContent).not.toContain('Run Complete');
 
     await view.unmount();
   });

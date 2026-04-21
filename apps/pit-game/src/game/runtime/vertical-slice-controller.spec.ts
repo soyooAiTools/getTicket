@@ -3,14 +3,18 @@ import { describe, expect, it } from 'vitest';
 import { minorityThreatVerticalSlice } from '../fixtures/minority-threat-vertical-slice';
 import { createVerticalSliceController } from './vertical-slice-controller';
 
-describe('vertical slice controller', () => {
-  it('does not advance before playback starts', () => {
+describe('vertical slice controller lifecycle', () => {
+  it('does not advance until start is called', () => {
     const controller = createVerticalSliceController(minorityThreatVerticalSlice);
 
-    controller.step({ action: 'move', targetZone: 'edge' }, 1_000);
+    controller.step({ action: 'move', targetZone: 'edge' }, 2_000);
 
     expect(controller.getSnapshot().elapsedMs).toBe(0);
-    expect(controller.isRunning()).toBe(false);
+
+    controller.start();
+    controller.step({ action: 'move', targetZone: 'edge' }, 2_000);
+
+    expect(controller.getSnapshot().elapsedMs).toBe(2_000);
   });
 
   it('publishes step updates to subscribers', () => {
@@ -60,5 +64,37 @@ describe('vertical slice controller', () => {
     expect(afterReset.player.balance).toBe(100);
     expect(afterReset.player.stamina).toBe(100);
     expect(afterReset.fixture).toBe(minorityThreatVerticalSlice);
+  });
+
+  it('publishes a completed summary when forced complete is called', () => {
+    const controller = createVerticalSliceController(minorityThreatVerticalSlice);
+    controller.start();
+    controller.step({ action: 'brace', targetZone: 'center' }, 1_000);
+    controller.complete();
+
+    expect(controller.getSnapshot().completed).toBe(true);
+    expect(controller.getSnapshot().summary?.label).toBe('Survived');
+    expect(controller.getSnapshot().player.zone).toBe('center');
+    expect(controller.getSnapshot().player.pose).toBe('brace');
+  });
+
+  it('does not rewrite a failed session when complete is called after a drop', () => {
+    const controller = createVerticalSliceController(minorityThreatVerticalSlice);
+
+    controller.start();
+
+    for (let index = 0; index < 30; index += 1) {
+      controller.step({ action: 'idle', targetZone: 'center' }, 1_000);
+      if (controller.getSnapshot().failed) {
+        break;
+      }
+    }
+
+    controller.complete();
+
+    expect(controller.getSnapshot().failed).toBe(true);
+    expect(controller.getSnapshot().summary?.label).toBe('Dropped');
+    expect(controller.getSnapshot().player.status).toBe('down');
+    expect(controller.getSnapshot().player.pose).toBe('fall');
   });
 });
