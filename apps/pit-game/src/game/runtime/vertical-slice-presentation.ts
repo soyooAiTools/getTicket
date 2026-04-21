@@ -1,4 +1,8 @@
-import { createVerticalSliceFrame, type SliceLightCue } from '../domain/vertical-slice-director';
+import {
+  createVerticalSliceFrame,
+  type SliceCameraCue,
+  type SliceLightCue,
+} from '../domain/vertical-slice-director';
 import type { VerticalSliceSession, VerticalSliceZone } from './vertical-slice-session';
 import { resolveCameraShoulderFrame, resolveVenueAnchor } from './vertical-slice-venue';
 
@@ -31,7 +35,7 @@ export interface SliceLightPalette {
 
 export interface SliceRenderState {
   camera: {
-    mode: 'impact' | 'pressure';
+    mode: SliceCameraCue;
     zoom: number;
     playerScreenX: number;
     playerScreenY: number;
@@ -231,7 +235,7 @@ export function createSliceRenderState(session: VerticalSliceSession): SliceRend
 
   return {
     camera: {
-      mode: frame.cameraCue === 'impact' ? 'impact' : 'pressure',
+      mode: frame.cameraCue,
       zoom: cameraFrame.zoom,
       playerScreenX: cameraFrame.playerScreenX,
       playerScreenY: cameraFrame.playerScreenY,

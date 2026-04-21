@@ -1,22 +1,23 @@
 import type { VerticalSliceZone } from './vertical-slice-session';
 
+export const VENUE_ANCHORS = {
+  stage: { x: 640, y: 146 },
+  front: { x: 640, y: 286 },
+  center: { x: 640, y: 452 },
+  edge: { x: 640, y: 628 },
+} as const;
+
+export const CAMERA_SHOULDER_FRAMES = {
+  front: { playerScreenX: 620, playerScreenY: 470, zoom: 1.08 },
+  center: { playerScreenX: 620, playerScreenY: 520, zoom: 1.02 },
+  edge: { playerScreenX: 620, playerScreenY: 520, zoom: 1.02 },
+  side: { playerScreenX: 560, playerScreenY: 520, zoom: 1.02 },
+} as const;
+
 export function resolveVenueAnchor(key: 'stage' | 'front' | 'center' | 'edge') {
-  switch (key) {
-    case 'stage':
-      return { x: 640, y: 146 };
-    case 'front':
-      return { x: 640, y: 286 };
-    case 'center':
-      return { x: 640, y: 452 };
-    case 'edge':
-      return { x: 640, y: 628 };
-  }
+  return VENUE_ANCHORS[key];
 }
 
 export function resolveCameraShoulderFrame(zone: VerticalSliceZone) {
-  return {
-    playerScreenX: zone === 'side' ? 560 : 620,
-    playerScreenY: zone === 'front' ? 470 : 520,
-    zoom: zone === 'front' ? 1.08 : 1.02,
-  };
+  return CAMERA_SHOULDER_FRAMES[zone];
 }
