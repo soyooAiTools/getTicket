@@ -215,7 +215,7 @@ export function resolveSliceLightPalette(lightCue: SliceLightCue): SliceLightPal
         bodyAlpha: 0.92,
         crowdAlpha: 0.84,
       };
-    case 'tension':
+    case 'build':
       return {
         venueFill: 0x1c110f,
         bandFill: 0x3d1f1a,
@@ -252,6 +252,18 @@ export function resolveSliceLightPalette(lightCue: SliceLightCue): SliceLightPal
         crowdAlpha: 0.8,
       };
   }
+
+  return {
+    venueFill: 0x130e0d,
+    bandFill: 0x25100f,
+    barrierFill: 0xb18a62,
+    pitFill: 0x241715,
+    edgeFill: 0x1a1211,
+    panelFill: 0x090808,
+    accentText: '#e8c894',
+    bodyAlpha: 0.92,
+    crowdAlpha: 0.84,
+  };
 }
 
 function resolvePlayerPosition(zone: VerticalSliceZone): { x: number; y: number } {
@@ -269,12 +281,16 @@ function resolvePlayerPosition(zone: VerticalSliceZone): { x: number; y: number 
 
 function formatPhaseLabel(frame: VerticalSliceFrame): string {
   switch (frame.phase.kind) {
-    case 'tension-in':
-      return 'Phase: Tension In';
+    case 'walk-in-pressure':
+      return 'Phase: Walk-In Pressure';
+    case 'build':
+      return 'Phase: Build';
     case 'breakdown-peak':
       return 'Phase: Breakdown Peak';
     case 'aftershock':
       return 'Phase: Aftershock';
+    default:
+      return `Phase: ${frame.phase.kind}`;
   }
 }
 
@@ -296,14 +312,14 @@ export function stepSceneController(
   const safeDelta = Math.max(0, delta);
   let remainingMs = safeDelta;
   let snapshot = controller.getSnapshot();
-  let punchDetected = snapshot.frame.cameraCue === 'punch';
+  let punchDetected = snapshot.frame.cameraCue === 'impact';
   let punchWindowKey = punchDetected ? getVerticalSliceWindowKey(snapshot.frame) : null;
 
   while (remainingMs > 0) {
     const sliceMs = Math.min(remainingMs, maxStepMs);
     controller.step(input, sliceMs);
     snapshot = controller.getSnapshot();
-    if (snapshot.frame.cameraCue === 'punch') {
+    if (snapshot.frame.cameraCue === 'impact') {
       punchDetected = true;
       punchWindowKey = getVerticalSliceWindowKey(snapshot.frame);
     }
@@ -461,7 +477,8 @@ export function buildVerticalSliceScene(controller: VerticalSliceController) {
       this.player.setScale(poseStyle.scaleX, poseStyle.scaleY);
       this.player.setAngle(poseStyle.angle);
 
-      const impactKey = punchWindowKey ?? (snapshot.frame.cameraCue === 'punch' ? getVerticalSliceWindowKey(snapshot.frame) : null);
+      const impactKey =
+        punchWindowKey ?? (snapshot.frame.cameraCue === 'impact' ? getVerticalSliceWindowKey(snapshot.frame) : null);
       if (punchDetected && impactKey && impactKey !== this.lastImpactKey) {
         this.cameras.main.shake(120, 0.0045);
         this.cameras.main.zoomTo(1.025, 90);

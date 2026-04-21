@@ -10,6 +10,7 @@ import type {
 export type SliceRecommendedAction = VerticalSliceRecommendedAction;
 export type SliceCameraCue = VerticalSliceCameraCue;
 export type SliceLightCue = VerticalSliceLightCue;
+export type { VerticalSliceFrame } from './vertical-slice';
 
 const ACTIVE_EVENT_WINDOW_MS = 250;
 

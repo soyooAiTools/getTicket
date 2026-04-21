@@ -38,7 +38,7 @@ describe('vertical slice session', () => {
   it('captures authored event windows during large-dt stepping instead of skipping them', () => {
     let session = createVerticalSliceSession(minorityThreatVerticalSlice);
 
-    session = stepVerticalSliceSession(session, { action: 'idle', targetZone: 'edge' }, 7_300);
+    session = stepVerticalSliceSession(session, { action: 'idle', targetZone: 'edge' }, 6_800);
     session = stepVerticalSliceSession(session, { action: 'slip', targetZone: 'side' }, 400);
 
     expect(session.frame.event?.kind).toBe('lateral-surge');
@@ -49,11 +49,13 @@ describe('vertical slice session', () => {
   it('only counts a matching authored window once across repeated steps', () => {
     let session = createVerticalSliceSession(minorityThreatVerticalSlice);
 
-    session = stepVerticalSliceSession(session, { action: 'move', targetZone: 'edge' }, 1_000);
+    session = stepVerticalSliceSession(session, { action: 'move', targetZone: 'edge' }, 2_400);
+    session = stepVerticalSliceSession(session, { action: 'move', targetZone: 'edge' }, 100);
     session = stepVerticalSliceSession(session, { action: 'move', targetZone: 'edge' }, 100);
     session = stepVerticalSliceSession(session, { action: 'move', targetZone: 'edge' }, 100);
 
-    expect(session.frame.phase.kind).toBe('tension-in');
-    expect(session.hitWindows).toBe(1);
+    expect(session.frame.phase.kind).toBe('walk-in-pressure');
+    expect(session.frame.event?.kind).toBe('crowd-build');
+    expect(session.hitWindows).toBe(2);
   });
 });

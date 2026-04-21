@@ -117,18 +117,18 @@ describe('vertical slice scene helpers', () => {
     const controller = createVerticalSliceController(minorityThreatVerticalSlice);
     controller.start();
     controller.step({ action: 'brace', targetZone: 'edge' }, 8_700);
-    const expectedPunchKey = 'event:breakdown-hit:9000';
+    const expectedPunchKey = 'event:breakdown-hit:10250';
 
     const result = stepSceneController(
       controller,
       { action: 'brace', targetZone: 'center' },
-      800,
+      1_800,
     );
 
     expect(result.punchDetected).toBe(true);
     expect(result.punchWindowKey).toBe(expectedPunchKey);
-    expect(result.snapshot.elapsedMs).toBe(9_500);
-    expect(result.snapshot.frame.cameraCue).toBe('steady');
+    expect(result.snapshot.elapsedMs).toBe(10_500);
+    expect(result.snapshot.frame.cameraCue).toBe('impact');
   });
 
   it('repaints the final snapshot when the controller completes outside the update loop', () => {
